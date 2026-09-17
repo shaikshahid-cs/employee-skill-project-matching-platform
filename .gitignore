@@ -1,0 +1,25 @@
+# VS Code
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+
+# Java / Spring Boot
+target/
+*.class
+
+# Node.js
+node_modules/
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

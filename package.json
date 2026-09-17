@@ -1,0 +1,11 @@
+{
+  "name": "employee-matching-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend/employee-matching_1 && mvnw.cmd spring-boot:run",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend/employee-matching_1 && mvnw.cmd compile"
+  }
+}

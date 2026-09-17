@@ -1,0 +1,13 @@
+package com.employeematching.repository;
+
+import com.employeematching.entity.Employee;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+
+    Optional<Employee> findByUserId(Long userId);
+
+    boolean existsByUserId(Long userId);
+}

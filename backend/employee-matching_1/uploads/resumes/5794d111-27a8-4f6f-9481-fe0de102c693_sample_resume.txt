@@ -1,0 +1,2 @@
+Sample Resume Content
+Skills: Java, Spring Boot, React, SQL
