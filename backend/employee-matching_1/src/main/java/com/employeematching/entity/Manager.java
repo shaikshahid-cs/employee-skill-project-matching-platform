@@ -1,9 +1,10 @@
 package com.employeematching.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "manager")
+@Table(name = "manager_profile")
 public class Manager {
 
     @Id
@@ -14,10 +15,30 @@ public class Manager {
     @JoinColumn(name = "user_id", unique = true, nullable = false)
     private User user;
 
+    @Column(length = 100)
     private String department;
-    private String designation;
+
+    @Column(length = 30)
+    private String phone;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     public Manager() {
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -44,11 +65,19 @@ public class Manager {
         this.department = department;
     }
 
-    public String getDesignation() {
-        return designation;
+    public String getPhone() {
+        return phone;
     }
 
-    public void setDesignation(String designation) {
-        this.designation = designation;
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
     }
 }

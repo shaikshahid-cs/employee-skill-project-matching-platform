@@ -7,12 +7,17 @@ const axiosClient = axios.create({
   },
 });
 
-// Passive Request Interceptor: Attaches Bearer token if present in localStorage
+// Passive Request Interceptor: Attaches Bearer token and handles FormData boundary
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // If the body is FormData, remove Content-Type so the browser can auto-generate
+    // the correct multipart/form-data boundary. Setting it manually omits the boundary.
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },

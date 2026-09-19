@@ -1,339 +1,543 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Briefcase,
-  Building,
-  MapPin,
-  Plus,
-  Edit3,
-  UploadCloud,
-  FileText,
-  Cpu,
-  Users,
-  CheckSquare,
-  AlertCircle,
-  CheckCircle,
-  Award
+  Briefcase, Building, MapPin, Plus, Trash2, Cpu, Users,
+  AlertCircle, CheckCircle2, Award, Eye, UserPlus, Filter,
+  ShieldCheck, UploadCloud, ArrowLeft
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/Modal';
 import SkillAutocomplete from '../../components/SkillAutocomplete';
+import MatchExplanationModal from '../../components/MatchExplanationModal';
 import projectApi from '../../api/projectApi';
 import projectSkillApi from '../../api/projectSkillApi';
-import jobDescriptionApi from '../../api/jobDescriptionApi';
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'txt'];
+import matchingApi from '../../api/matchingApi';
+import documentApi from '../../api/documentApi';
 
 export default function ProjectDetailsPage() {
   const { id: projectId } = useParams();
 
   const [project, setProject] = useState(null);
-  const [projectSkills, setProjectSkills] = useState([]);
-  const [jobDescription, setJobDescription] = useState(null);
+  const [skills, setSkills] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [candidates, setCandidates] = useState([]);
 
-  const [loadingProject, setLoadingProject] = useState(true);
-  const [loadingSkills, setLoadingSkills] = useState(true);
-  const [loadingJD, setLoadingJD] = useState(true);
-
+  const [loading, setLoading] = useState(true);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // Active Tab: 'candidates' | 'team' | 'specs'
+  const [activeTab, setActiveTab] = useState('candidates');
 
-  // Skill Modal State
+  // Candidate Filters
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [mandatoryOnly, setMandatoryOnly] = useState(false);
+  const [minScore, setMinScore] = useState(0);
+
+  // Skill Add Modal
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-  const [editingSkillId, setEditingSkillId] = useState(null);
-  const [skillName, setSkillName] = useState('');
-  const [requiredProficiency, setRequiredProficiency] = useState(3);
-  const [importance, setImportance] = useState(3);
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newProf, setNewProf] = useState(3);
+  const [newImp, setNewImp] = useState(3);
+  const [newMandatory, setNewMandatory] = useState(false);
   const [submittingSkill, setSubmittingSkill] = useState(false);
 
-  // JD Upload State
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadingJD, setUploadingJD] = useState(false);
-  const [processingJD, setProcessingJD] = useState(false);
-  const [extractedSkills, setExtractedSkills] = useState([]);
+  // Assign Candidate Modal
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [candidateToAssign, setCandidateToAssign] = useState(null);
+  const [assignedRole, setAssignedRole] = useState('');
+  const [submittingAssign, setSubmittingAssign] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
+  // Explain Match Modal
+  const [selectedMatchId, setSelectedMatchId] = useState(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
 
-    const fetchData = async () => {
-      // 1. Fetch Manager Projects to locate this project
-      try {
-        setLoadingProject(true);
-        const projectsList = await projectApi.getManagerProjects();
-        if (isMounted && Array.isArray(projectsList)) {
-          const found = projectsList.find((p) => String(p.id) === String(projectId));
-          setProject(found || null);
-        }
-      } catch {
-        if (isMounted) setProject(null);
-      } finally {
-        if (isMounted) setLoadingProject(false);
-      }
+  // Assistive JD Modal
+  const [isJdModalOpen, setIsJdModalOpen] = useState(false);
+  const [jdFile, setJdFile] = useState(null);
+  const [extractingJd, setExtractingJd] = useState(false);
+  const [jdPreview, setJdPreview] = useState(null);
 
-      // 2. Fetch Project Required Skills
-      try {
-        setLoadingSkills(true);
-        const skillsList = await projectSkillApi.getSkillsForProject(projectId);
-        if (isMounted) setProjectSkills(Array.isArray(skillsList) ? skillsList : []);
-      } catch {
-        if (isMounted) setProjectSkills([]);
-      } finally {
-        if (isMounted) setLoadingSkills(false);
-      }
+  const fetchProjectData = async () => {
+    try {
+      setLoading(true);
+      const [projData, skillsData, assignData] = await Promise.allSettled([
+        projectApi.getProjectById(projectId),
+        projectSkillApi.getSkillsForProject(projectId),
+        projectApi.getProjectAssignments(projectId),
+      ]);
 
-      // 3. Fetch Job Description Metadata
-      try {
-        setLoadingJD(true);
-        const jdData = await jobDescriptionApi.getJobDescription(projectId);
-        if (isMounted) setJobDescription(jdData || null);
-      } catch {
-        if (isMounted) setJobDescription(null);
-      } finally {
-        if (isMounted) setLoadingJD(false);
-      }
-    };
-
-    fetchData();
-    return () => { isMounted = false; };
-  }, [projectId, refreshTrigger]);
-
-  const handleRefresh = () => setRefreshTrigger((prev) => prev + 1);
-
-  // --- PROJECT SKILLS ACTIONS ---
-  const handleOpenSkillModal = (skill = null) => {
-    setError('');
-    if (skill) {
-      setEditingSkillId(skill.id);
-      setSkillName(skill.skillName || '');
-      setRequiredProficiency(skill.requiredProficiency || 3);
-      setImportance(skill.importance || 3);
-    } else {
-      setEditingSkillId(null);
-      setSkillName('');
-      setRequiredProficiency(3);
-      setImportance(3);
+      if (projData.status === 'fulfilled') setProject(projData.value);
+      if (skillsData.status === 'fulfilled') setSkills(Array.isArray(skillsData.value) ? skillsData.value : []);
+      if (assignData.status === 'fulfilled') setAssignments(Array.isArray(assignData.value) ? assignData.value : []);
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to load project details.');
+    } finally {
+      setLoading(false);
     }
-    setIsSkillModalOpen(true);
   };
 
-  const handleSkillSubmit = async (e) => {
+  const fetchCandidates = async () => {
+    try {
+      setLoadingCandidates(true);
+      const data = await matchingApi.getCandidatesForProject(projectId);
+      setCandidates(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to calculate candidate matches.');
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjectData();
+    fetchCandidates();
+  }, [projectId]);
+
+  // Skill Management
+  const handleAddSkill = async (e) => {
     e.preventDefault();
-    setError('');
-
-    if (!skillName.trim()) {
-      setError('Please search and select a skill name.');
-      return;
-    }
-
-    const profVal = parseInt(requiredProficiency, 10);
-    const impVal = parseInt(importance, 10);
-
-    if (isNaN(profVal) || profVal < 1 || profVal > 5) {
-      setError('Required proficiency must be between 1 and 5.');
-      return;
-    }
-
-    if (isNaN(impVal) || impVal < 1 || impVal > 5) {
-      setError('Importance weight must be between 1 and 5.');
-      return;
-    }
+    if (!newSkillName.trim()) return;
 
     try {
       setSubmittingSkill(true);
-      const payload = {
-        projectId: parseInt(projectId, 10),
-        skillName: skillName.trim(),
-        requiredProficiency: profVal,
-        importance: impVal,
-      };
+      await projectSkillApi.addSkillToProject(projectId, {
+        skillName: newSkillName.trim(),
+        requiredProficiency: parseInt(newProf, 10),
+        importance: parseInt(newImp, 10),
+        mandatory: Boolean(newMandatory),
+      });
 
-      if (editingSkillId) {
-        await projectSkillApi.updateProjectSkill(editingSkillId, payload);
-        setSuccess('Required project skill updated successfully!');
-      } else {
-        await projectSkillApi.addProjectSkill(payload);
-        setSuccess('Required project skill added successfully!');
-      }
-
+      setSuccess(`Skill "${newSkillName}" added to project requirements.`);
       setIsSkillModalOpen(false);
-      handleRefresh();
+      setNewSkillName('');
+      fetchProjectData();
+      fetchCandidates(); // Re-run matching
     } catch (err) {
-      setError(err.message || 'Failed to save project skill.');
+      setError(err?.response?.data?.message || err.message || 'Failed to add skill.');
     } finally {
       setSubmittingSkill(false);
     }
   };
 
-  // --- JOB DESCRIPTION ACTIONS ---
-  const handleFileChange = (e) => {
-    setError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError('File size exceeds maximum allowed limit of 5MB.');
-      setSelectedFile(null);
-      return;
+  const handleDeleteSkill = async (skillId, name) => {
+    if (!window.confirm(`Remove required skill "${name}"?`)) return;
+    try {
+      await projectSkillApi.deleteSkillFromProject(projectId, skillId);
+      setSuccess(`Skill "${name}" removed.`);
+      fetchProjectData();
+      fetchCandidates();
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to remove skill.');
     }
-
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
-      setError('File type not supported. Allowed formats: PDF, DOCX, DOC, TXT');
-      setSelectedFile(null);
-      return;
-    }
-
-    setSelectedFile(file);
   };
 
-  const handleJDUploadSubmit = async (e) => {
+  // Staffing Actions
+  const handleOpenAssignModal = (candidate) => {
+    setCandidateToAssign(candidate);
+    setAssignedRole(project?.requiredRole || candidate.employeeDesignation || 'Engineer');
+    setIsAssignModalOpen(true);
+  };
+
+  const handleConfirmAssign = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!selectedFile) {
-      setError('Please select a valid Job Description file (PDF, DOCX, DOC, TXT <= 5MB).');
-      return;
-    }
+    if (!candidateToAssign) return;
 
     try {
-      setUploadingJD(true);
-      await jobDescriptionApi.uploadJobDescription(projectId, selectedFile);
-      setSuccess(`Job Description "${selectedFile.name}" uploaded successfully!`);
-      setSelectedFile(null);
-      handleRefresh();
+      setSubmittingAssign(true);
+      await projectApi.assignEmployee(projectId, candidateToAssign.employeeId, assignedRole);
+      setSuccess(`Employee ${candidateToAssign.employeeName} assigned to project as "${assignedRole}"!`);
+      setIsAssignModalOpen(false);
+      setCandidateToAssign(null);
+      fetchProjectData();
     } catch (err) {
-      setError(err.message || 'Failed to upload Job Description file.');
+      setError(err?.response?.data?.message || err.message || 'Failed to assign candidate.');
     } finally {
-      setUploadingJD(false);
+      setSubmittingAssign(false);
     }
   };
 
-  const handleProcessJD = async () => {
-    setError('');
-    setSuccess('');
-    setExtractedSkills([]);
-
+  const handleUnassign = async (employeeId, employeeName) => {
+    if (!window.confirm(`Unassign ${employeeName} from this project?`)) return;
     try {
-      setProcessingJD(true);
-      const res = await jobDescriptionApi.processJobDescription(projectId);
-      if (res && Array.isArray(res.detectedSkills)) {
-        setExtractedSkills(res.detectedSkills);
-        setSuccess(`Job Description parsed! ${res.detectedSkills.length} required skills extracted.`);
-      } else {
-        setSuccess('Job Description processing completed.');
-      }
-      handleRefresh();
+      await projectApi.unassignEmployee(projectId, employeeId);
+      setSuccess(`${employeeName} unassigned successfully.`);
+      fetchProjectData();
     } catch (err) {
-      setError(err.message || 'Failed to process Job Description.');
-    } finally {
-      setProcessingJD(false);
+      setError(err?.response?.data?.message || err.message || 'Failed to unassign member.');
     }
   };
+
+  // Assistive JD extraction
+  const handleExtractJd = async () => {
+    if (!jdFile) return;
+    try {
+      setExtractingJd(true);
+      setError('');
+      const preview = await documentApi.extractJobDescription(jdFile);
+      setJdPreview(preview);
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to extract JD.');
+    } finally {
+      setExtractingJd(false);
+    }
+  };
+
+  const handleApplyJdToProject = async () => {
+    if (!jdPreview) return;
+    try {
+      setExtractingJd(true);
+      await documentApi.applyJobDescription(projectId, jdPreview);
+      setSuccess('Job description requirements applied to project!');
+      setIsJdModalOpen(false);
+      setJdPreview(null);
+      setJdFile(null);
+      fetchProjectData();
+      fetchCandidates();
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to apply JD to project.');
+    } finally {
+      setExtractingJd(false);
+    }
+  };
+
+  const filteredCandidates = candidates.filter((c) => {
+    const query = candidateSearch.toLowerCase();
+    const matchesSearch =
+      (c.employeeName && c.employeeName.toLowerCase().includes(query)) ||
+      (c.employeeEmail && c.employeeEmail.toLowerCase().includes(query)) ||
+      (c.employeeDesignation && c.employeeDesignation.toLowerCase().includes(query)) ||
+      (c.employeeSkills && c.employeeSkills.some((s) => s.toLowerCase().includes(query)));
+
+    const matchesMandatory = !mandatoryOnly || c.mandatoryPassed !== false;
+    const matchesMinScore = c.matchScore >= minScore;
+
+    return matchesSearch && matchesMandatory && matchesMinScore;
+  });
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1>Project Details & Requirements</h1>
-          <p>Configure project skill constraints, Job Description files, and navigate to candidate matching.</p>
-        </div>
+      {/* Back button & Page header */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <Link to="/manager/projects" className="btn btn-secondary" style={{ display: 'inline-flex', padding: '0.35rem 0.75rem', fontSize: '0.825rem', marginBottom: '0.75rem' }}>
+          <ArrowLeft size={14} />
+          <span>Back to Projects</span>
+        </Link>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <Link to={`/manager/projects/${projectId}/candidates`} className="btn btn-primary" style={{ textDecoration: 'none' }}>
-            <Users size={18} />
-            <span>Match Candidates</span>
-          </Link>
-          <Link to={`/manager/projects/${projectId}/applications`} className="btn btn-secondary" style={{ textDecoration: 'none' }}>
-            <CheckSquare size={18} />
-            <span>Applications</span>
-          </Link>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <span>{project?.title || 'Project Details'}</span>
+              <Badge variant={project?.status === 'OPEN' ? 'emerald' : 'slate'}>{project?.status || 'OPEN'}</Badge>
+            </h1>
+            <p style={{ marginTop: '0.35rem' }}>
+              Role: <strong>{project?.requiredRole}</strong> &bull; Domain: <strong>{project?.requiredDomain}</strong> &bull; Work Mode: <strong>{project?.workMode || 'Remote'}</strong>
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => { setIsJdModalOpen(true); setJdPreview(null); }}
+            >
+              <Cpu size={16} />
+              <span>Update via JD Document</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {error && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--error)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          color: '#f87171',
+          fontSize: '0.875rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: 'var(--success)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CheckCircle size={18} />
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          color: '#34d399',
+          fontSize: '0.875rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <CheckCircle2 size={18} />
           <span>{success}</span>
         </div>
       )}
 
-      {/* PROJECT METADATA CARD */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <Card title={loadingProject ? 'Loading Project Details...' : project?.title || `Project #${projectId}`}>
-          {project && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Building size={16} /> Department: <strong style={{ color: 'var(--text-main)' }}>{project.department}</strong>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <MapPin size={16} /> Location: <strong style={{ color: 'var(--text-main)' }}>{project.location}</strong>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Briefcase size={16} /> Min Experience: <strong style={{ color: 'var(--text-main)' }}>{project.experienceRequired} yrs</strong>
-                </span>
-                <Badge variant={project.status === 'OPEN' ? 'indigo' : 'secondary'}>{project.status}</Badge>
-              </div>
+      {/* TABS HEADER */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        borderBottom: '1px solid var(--border-color)',
+        marginBottom: '1.5rem'
+      }}>
+        <button
+          className="btn"
+          style={{
+            background: activeTab === 'candidates' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'candidates' ? '#fff' : 'var(--text-muted)',
+            borderBottom: activeTab === 'candidates' ? '2px solid var(--primary)' : 'none',
+            borderRadius: '6px 6px 0 0'
+          }}
+          onClick={() => setActiveTab('candidates')}
+        >
+          Candidate Match Matrix ({candidates.length})
+        </button>
 
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-                {project.description}
-              </p>
-            </div>
-          )}
-        </Card>
+        <button
+          className="btn"
+          style={{
+            background: activeTab === 'team' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'team' ? '#fff' : 'var(--text-muted)',
+            borderBottom: activeTab === 'team' ? '2px solid var(--primary)' : 'none',
+            borderRadius: '6px 6px 0 0'
+          }}
+          onClick={() => setActiveTab('team')}
+        >
+          Staffed Team ({assignments.length})
+        </button>
+
+        <button
+          className="btn"
+          style={{
+            background: activeTab === 'specs' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'specs' ? '#fff' : 'var(--text-muted)',
+            borderBottom: activeTab === 'specs' ? '2px solid var(--primary)' : 'none',
+            borderRadius: '6px 6px 0 0'
+          }}
+          onClick={() => setActiveTab('specs')}
+        >
+          Project Requisition Specs
+        </button>
       </div>
 
-      <div className="grid grid-cols-2">
-        {/* REQUIRED PROJECT SKILLS CARD */}
-        <Card
-          title="Required Project Skills"
-          subtitle="Skill constraints & weight importance (1 - 5)"
-          action={
-            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleOpenSkillModal(null)}>
-              <Plus size={16} /> Add Required Skill
-            </button>
-          }
-        >
-          {loadingSkills ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading required skills...</div>
-          ) : projectSkills.length === 0 ? (
+      {/* TAB 1: CANDIDATE MATCH MATRIX */}
+      {activeTab === 'candidates' && (
+        <div>
+          {/* Filters Bar */}
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            alignItems: 'center',
+            marginBottom: '1.25rem',
+            flexWrap: 'wrap',
+            padding: '1rem',
+            background: 'var(--bg-surface)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-color)'
+          }}>
+            <div style={{ flex: 2, minWidth: '220px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search candidates by name, designation, skill..."
+                value={candidateSearch}
+                onChange={(e) => setCandidateSearch(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="checkbox"
+                id="filter-mandatory"
+                checked={mandatoryOnly}
+                onChange={(e) => setMandatoryOnly(e.target.checked)}
+              />
+              <label htmlFor="filter-mandatory" style={{ fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer' }}>
+                Only Mandatory Passed
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Min Score:</span>
+              <select
+                className="form-input"
+                style={{ width: 'auto' }}
+                value={minScore}
+                onChange={(e) => setMinScore(parseInt(e.target.value, 10))}
+              >
+                <option value="0">All Scores (0%+)</option>
+                <option value="40">40%+</option>
+                <option value="60">60%+</option>
+                <option value="75">75%+</option>
+                <option value="85">85%+</option>
+              </select>
+            </div>
+          </div>
+
+          <Card title="Ranked Candidate Matches" subtitle="Deterministic 6-dimension algorithmic match results">
+            {loadingCandidates ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-dim)' }}>
+                Running deterministic scoring algorithm across employee database...
+              </div>
+            ) : filteredCandidates.length === 0 ? (
+              <div className="empty-state">
+                <Users size={36} />
+                <h3>No candidates matched</h3>
+                <p>Try adjusting filter criteria or verify employee skills in the platform.</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Candidate</th>
+                      <th>Designation & Exp</th>
+                      <th>Match Score</th>
+                      <th>Mandatory Status</th>
+                      <th>Skills Overlap</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCandidates.map((c) => {
+                      const score = Math.round(c.matchScore);
+                      const isPassed = c.mandatoryPassed !== false;
+                      const isAlreadyAssigned = assignments.some(a => a.employeeId === c.employeeId);
+
+                      return (
+                        <tr key={c.id || c.employeeId}>
+                          <td style={{ fontWeight: 600 }}>
+                            <div style={{ color: 'var(--text-main)' }}>{c.employeeName}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>{c.employeeEmail}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                              {c.employeeDesignation || 'Engineer'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                              {c.employeeExperience} yrs experience
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{
+                                fontSize: '1.1rem',
+                                fontWeight: 700,
+                                color: score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171'
+                              }}>
+                                {score}%
+                              </span>
+                              <div style={{ width: '60px', height: '6px', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{
+                                  width: `${Math.min(100, score)}%`,
+                                  height: '100%',
+                                  backgroundColor: score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171'
+                                }} />
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            {isPassed ? (
+                              <Badge variant="emerald">PASS</Badge>
+                            ) : (
+                              <Badge variant="rose">MANDATORY FAILED</Badge>
+                            )}
+                          </td>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {c.skillsPoints !== undefined ? `${c.skillsPoints} / 35 pts` : `${Math.round((c.skillsScore || 0) * 100)}%`}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                                onClick={() => {
+                                  setSelectedMatchId(c.id);
+                                  setSelectedCandidateId(c.employeeId);
+                                  setIsExplanationOpen(true);
+                                }}
+                              >
+                                <Eye size={13} />
+                                <span>Explain</span>
+                              </button>
+
+                              {isAlreadyAssigned ? (
+                                <Badge variant="emerald">Already Staffed</Badge>
+                              ) : (
+                                <button
+                                  className="btn btn-primary"
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                                  onClick={() => handleOpenAssignModal(c)}
+                                >
+                                  <UserPlus size={13} />
+                                  <span>Assign</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 2: STAFFED TEAM */}
+      {activeTab === 'team' && (
+        <Card title="Project Staffing & Team" subtitle={`${assignments.length} team members assigned to project`}>
+          {assignments.length === 0 ? (
             <div className="empty-state">
-              <Award size={36} />
-              <h3>No required skills specified</h3>
-              <p>Click "Add Required Skill" above or upload a Job Description to parse skills automatically.</p>
+              <Users size={36} />
+              <h3>No team members staffed yet</h3>
+              <p>Go to the "Candidate Match Matrix" tab to evaluate candidates and directly assign them to this project.</p>
             </div>
           ) : (
             <div className="table-container">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Skill Name</th>
-                    <th>Req. Proficiency</th>
-                    <th>Importance Weight</th>
-                    <th>Action</th>
+                    <th>Member Name</th>
+                    <th>Email</th>
+                    <th>Assigned Role</th>
+                    <th>Date Staffed</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {projectSkills.map((sk) => (
-                    <tr key={sk.id}>
-                      <td style={{ fontWeight: 600 }}>{sk.skillName}</td>
-                      <td><Badge variant="indigo">{sk.requiredProficiency} / 5</Badge></td>
-                      <td><Badge variant="amber">{sk.importance} / 5</Badge></td>
+                  {assignments.map((a) => (
+                    <tr key={a.id}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{a.employeeName}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.employeeEmail}</td>
                       <td>
-                        <button className="btn-secondary" style={{ padding: '0.35rem' }} onClick={() => handleOpenSkillModal(sk)} title="Edit Skill">
-                          <Edit3 size={15} />
+                        <Badge variant="indigo">{a.assignedRole || 'Engineer'}</Badge>
+                      </td>
+                      <td style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                        {a.assignmentDate ? new Date(a.assignmentDate).toLocaleDateString() : 'Active'}
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: '#f87171' }}
+                          onClick={() => handleUnassign(a.employeeId, a.employeeName)}
+                        >
+                          Unassign
                         </button>
                       </td>
                     </tr>
@@ -343,141 +547,289 @@ export default function ProjectDetailsPage() {
             </div>
           )}
         </Card>
+      )}
 
-        {/* JOB DESCRIPTION CARD */}
-        <Card title="Job Description Document" subtitle="Upload & process JD files (PDF, DOCX, DOC, TXT <= 5MB)">
-          {loadingJD ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading Job Description data...</div>
-          ) : (
-            <div>
-              {jobDescription ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      <FileText size={24} style={{ color: 'var(--primary)' }} />
-                      <div>
-                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{jobDescription.fileName}</h4>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>Uploaded: {jobDescription.uploadedAt || 'N/A'}</p>
-                      </div>
-                    </div>
-                    <Badge variant={jobDescription.processingStatus === 'PROCESSED' ? 'success' : 'amber'}>
-                      {jobDescription.processingStatus}
-                    </Badge>
-                  </div>
+      {/* TAB 3: PROJECT REQUISITION SPECS */}
+      {activeTab === 'specs' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <Card title="Scope & Architecture" subtitle="Project description">
+            <p style={{ lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+              {project?.description}
+            </p>
+          </Card>
 
-                  <button
-                    className="btn btn-primary w-full"
-                    onClick={handleProcessJD}
-                    disabled={processingJD}
-                  >
-                    <Cpu size={18} />
-                    <span>{processingJD ? 'Parsing Document...' : 'Parse & Extract Skills'}</span>
-                  </button>
-
-                  {extractedSkills.length > 0 && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--success)', marginBottom: '0.5rem' }}>
-                        Extracted {extractedSkills.length} required skills from document:
-                      </p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {extractedSkills.map((s, idx) => (
-                          <Badge key={idx} variant="indigo">{s.name || s.skillName || s}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+          <Card title="Mandatory vs. Preferred Requisition Criteria" subtitle="Configured evaluation criteria">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Required Role</span>
+                <p style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{project?.requiredRole}</p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  {project?.isRoleMandatory ? <Badge variant="rose">🔒 Mandatory</Badge> : <Badge variant="slate">Preferred</Badge>}
                 </div>
-              ) : (
-                <form onSubmit={handleJDUploadSubmit}>
-                  <div style={{
-                    border: '2px dashed var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1.5rem',
-                    textAlign: 'center',
-                    backgroundColor: 'var(--bg-surface)',
-                    cursor: 'pointer',
-                    marginBottom: '1rem'
-                  }}>
-                    <UploadCloud size={36} style={{ color: 'var(--primary)', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      {selectedFile ? selectedFile.name : 'Select Job Description document'}
-                    </p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>
-                      {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOCX, DOC, TXT up to 5MB'}
-                    </p>
-                    <input
-                      type="file"
-                      accept=".pdf,.docx,.doc,.txt"
-                      onChange={handleFileChange}
-                      style={{ marginTop: '0.75rem' }}
-                    />
-                  </div>
+              </div>
 
-                  <button type="submit" className="btn btn-primary w-full" disabled={!selectedFile || uploadingJD}>
-                    {uploadingJD ? 'Uploading JD...' : 'Upload Job Description'}
-                  </button>
-                </form>
+              <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Required Domain</span>
+                <p style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{project?.requiredDomain}</p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  {project?.isDomainMandatory ? <Badge variant="rose">🔒 Mandatory</Badge> : <Badge variant="slate">Preferred</Badge>}
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Min Experience</span>
+                <p style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{project?.minExperienceYears} Years</p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  {project?.isExperienceMandatory ? <Badge variant="rose">🔒 Mandatory</Badge> : <Badge variant="slate">Preferred</Badge>}
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Degree Level</span>
+                <p style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                  {project?.requiredDegreeLevel || 'Bachelor'} in {project?.requiredDegreeField || 'CS'}
+                </p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  {project?.isEducationMandatory ? <Badge variant="rose">🔒 Mandatory</Badge> : <Badge variant="slate">Preferred</Badge>}
+                </div>
+              </div>
+
+              {project?.requiredCertification && (
+                <div style={{ padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Required Certification</span>
+                  <p style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.25rem' }}>{project?.requiredCertification}</p>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {project?.isCertificationMandatory ? <Badge variant="rose">🔒 Mandatory</Badge> : <Badge variant="slate">Preferred</Badge>}
+                  </div>
+                </div>
               )}
             </div>
-          )}
-        </Card>
-      </div>
+          </Card>
 
-      {/* SKILL MODAL */}
-      <Modal isOpen={isSkillModalOpen} onClose={() => setIsSkillModalOpen(false)} title={editingSkillId ? 'Edit Required Skill' : 'Add Required Skill'}>
-        <form onSubmit={handleSkillSubmit}>
-          <div className="form-group">
-            <label className="form-label">Skill Name (Search Catalog)</label>
+          {/* Required Skills Table */}
+          <Card
+            title="Required Skills Inventory"
+            subtitle={`${skills.length} project technical skills`}
+            action={
+              <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => setIsSkillModalOpen(true)}>
+                <Plus size={14} />
+                <span>Add Skill</span>
+              </button>
+            }
+          >
+            {skills.length === 0 ? (
+              <p style={{ color: 'var(--text-dim)', fontSize: '0.875rem' }}>No skills currently assigned to requisition.</p>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Skill</th>
+                      <th>Min Proficiency</th>
+                      <th>Importance Weight</th>
+                      <th>Requirement Type</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skills.map((s) => (
+                      <tr key={s.id}>
+                        <td style={{ fontWeight: 600 }}>{s.skillName}</td>
+                        <td>Level {s.requiredProficiency || s.minProficiency} / 5</td>
+                        <td>Weight: {s.importance} / 5</td>
+                        <td>
+                          {s.mandatory || s.isMandatory ? (
+                            <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.8rem' }}>🔒 Mandatory</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>Preferred</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.45rem', color: '#f87171' }}
+                            onClick={() => handleDeleteSkill(s.skillId || s.id, s.skillName)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ASSIGN CANDIDATE MODAL */}
+      <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title="Staff Candidate to Project">
+        {candidateToAssign && (
+          <form onSubmit={handleConfirmAssign} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              Directly assigning <strong>{candidateToAssign.employeeName}</strong> ({candidateToAssign.employeeEmail}) to project <em>{project?.title}</em>.
+            </p>
+
+            <div>
+              <label className="form-label">Project Role Assignment *</label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                value={assignedRole}
+                onChange={(e) => setAssignedRole(e.target.value)}
+                placeholder="e.g. Lead Backend Engineer"
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsAssignModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={submittingAssign}>
+                {submittingAssign ? 'Assigning...' : 'Confirm Assignment'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ADD SKILL MODAL */}
+      <Modal isOpen={isSkillModalOpen} onClose={() => setIsSkillModalOpen(false)} title="Add Skill to Project Requisition">
+        <form onSubmit={handleAddSkill} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label className="form-label">Skill Name *</label>
             <SkillAutocomplete
-              value={skillName}
-              onChange={(val) => setSkillName(val)}
-              onSelectSkill={(s) => setSkillName(s.name)}
-              placeholder="Search skill catalog..."
+              value={newSkillName}
+              onChange={(val) => setNewSkillName(val)}
+              onSelectSkill={(skill) => setNewSkillName(skill.name)}
+              placeholder="e.g. Docker, PostgreSQL, Go..."
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Required Proficiency (1 - 5): {requiredProficiency}</label>
-            <input
-              type="range"
-              min="1"
-              max="5"
-              value={requiredProficiency}
-              onChange={(e) => setRequiredProficiency(e.target.value)}
-              style={{ width: '100%', accentColor: 'var(--primary)' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-              <span>1 (Basic)</span>
-              <span>3 (Intermediate)</span>
-              <span>5 (Expert)</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label className="form-label">Min Proficiency (1 to 5)</label>
+              <select className="form-input" value={newProf} onChange={(e) => setNewProf(e.target.value)}>
+                <option value="1">1 - Novice</option>
+                <option value="2">2 - Elementary</option>
+                <option value="3">3 - Competent</option>
+                <option value="4">4 - Advanced</option>
+                <option value="5">5 - Expert</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Importance (1 to 5)</label>
+              <select className="form-input" value={newImp} onChange={(e) => setNewImp(e.target.value)}>
+                <option value="1">1 - Low</option>
+                <option value="2">2 - Moderate</option>
+                <option value="3">3 - Standard</option>
+                <option value="4">4 - High</option>
+                <option value="5">5 - Critical</option>
+              </select>
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Importance Weight (1 - 5): {importance}</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <input
-              type="range"
-              min="1"
-              max="5"
-              value={importance}
-              onChange={(e) => setImportance(e.target.value)}
-              style={{ width: '100%', accentColor: 'var(--primary)' }}
+              type="checkbox"
+              id="skill-mandatory"
+              checked={newMandatory}
+              onChange={(e) => setNewMandatory(e.target.checked)}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-              <span>1 (Nice to have)</span>
-              <span>3 (Important)</span>
-              <span>5 (Critical)</span>
-            </div>
+            <label htmlFor="skill-mandatory" style={{ fontSize: '0.85rem', color: 'var(--text-main)', cursor: 'pointer' }}>
+              Mandatory Skill (Candidate must meet minimum proficiency or score caps at 40%)
+            </label>
           </div>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsSkillModalOpen(false)}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={submittingSkill}>
-              {submittingSkill ? 'Saving...' : 'Save Required Skill'}
+              {submittingSkill ? 'Adding...' : 'Add Requirement'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* ASSISTIVE JD EXTRACTION MODAL */}
+      <Modal isOpen={isJdModalOpen} onClose={() => setIsJdModalOpen(false)} title="Update Project from Job Description Document">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{
+            border: '2px dashed var(--border-color)',
+            padding: '1.5rem',
+            borderRadius: 'var(--radius-md)',
+            textAlign: 'center',
+            background: 'var(--bg-surface)'
+          }}>
+            <UploadCloud size={36} style={{ color: 'var(--primary)', margin: '0 auto 0.5rem' }} />
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 500, marginBottom: '0.25rem' }}>
+              Upload New Job Description Document
+            </p>
+            <input
+              type="file"
+              id="update-jd-file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={(e) => setJdFile(e.target.files?.[0] || null)}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="update-jd-file" className="btn btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+              Browse File...
+            </label>
+            {jdFile && (
+              <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>
+                {jdFile.name}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!jdFile || extractingJd}
+              onClick={handleExtractJd}
+            >
+              {extractingJd ? 'Extracting...' : 'Extract & Preview'}
+            </button>
+          </div>
+
+          {jdPreview && (
+            <div style={{
+              background: 'var(--bg-surface)',
+              padding: '1rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+              maxHeight: '260px',
+              overflowY: 'auto'
+            }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                Extracted Proposal
+              </h4>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}><strong>Role:</strong> {jdPreview.requiredRole}</p>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}><strong>Domain:</strong> {jdPreview.requiredDomain}</p>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}><strong>Min Experience:</strong> {jdPreview.minExperienceYears} yrs</p>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}><strong>Skills:</strong> {jdPreview.skills?.map(s => s.skillName).join(', ')}</p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-primary" onClick={handleApplyJdToProject}>
+                  Update Project Requirements
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* EXPLAIN MATCH MODAL */}
+      <MatchExplanationModal
+        isOpen={isExplanationOpen}
+        onClose={() => setIsExplanationOpen(false)}
+        matchResultId={selectedMatchId}
+        projectId={projectId}
+        employeeId={selectedCandidateId}
+      />
     </div>
   );
 }

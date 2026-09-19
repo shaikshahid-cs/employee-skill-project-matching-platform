@@ -15,6 +15,8 @@ public class CertificationRequest {
 
     private String expiryDate;
 
+    private String credentialId;
+
     public CertificationRequest() {
     }
 
@@ -48,5 +50,13 @@ public class CertificationRequest {
 
     public void setExpiryDate(String expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public String getCredentialId() {
+        return credentialId;
+    }
+
+    public void setCredentialId(String credentialId) {
+        this.credentialId = credentialId;
     }
 }

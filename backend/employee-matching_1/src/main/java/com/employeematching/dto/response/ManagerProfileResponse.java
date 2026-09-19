@@ -7,7 +7,11 @@ public class ManagerProfileResponse {
     private String name;
     private String email;
     private String department;
-    private String designation;
+    private String phone;
+    private int projectsCount;
+
+    public ManagerProfileResponse() {
+    }
 
     public ManagerProfileResponse(
             Long id,
@@ -15,14 +19,15 @@ public class ManagerProfileResponse {
             String name,
             String email,
             String department,
-            String designation) {
-
+            String phone,
+            int projectsCount) {
         this.id = id;
         this.userId = userId;
         this.name = name;
         this.email = email;
         this.department = department;
-        this.designation = designation;
+        this.phone = phone;
+        this.projectsCount = projectsCount;
     }
 
     public Long getId() {
@@ -45,7 +50,11 @@ public class ManagerProfileResponse {
         return department;
     }
 
-    public String getDesignation() {
-        return designation;
+    public String getPhone() {
+        return phone;
+    }
+
+    public int getProjectsCount() {
+        return projectsCount;
     }
 }

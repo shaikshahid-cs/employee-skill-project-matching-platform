@@ -10,14 +10,24 @@ public class Certification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
+    @Column(nullable = false, length = 200)
     private String name;
+
+    @Column(name = "issuing_organization", nullable = false, length = 150)
     private String issuingOrganization;
+
+    @Column(name = "issue_date", length = 30)
     private String issueDate;
+
+    @Column(name = "expiry_date", length = 30)
     private String expiryDate;
+
+    @Column(name = "credential_id", length = 100)
+    private String credentialId;
 
     public Certification() {
     }
@@ -68,5 +78,13 @@ public class Certification {
 
     public void setExpiryDate(String expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public String getCredentialId() {
+        return credentialId;
+    }
+
+    public void setCredentialId(String credentialId) {
+        this.credentialId = credentialId;
     }
 }

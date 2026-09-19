@@ -5,26 +5,22 @@ import axiosClient from './axiosClient';
  * Handles endpoints exposed by AdminController (/api/admin)
  */
 export const adminApi = {
-  /**
-   * Endpoint #45: GET /api/admin/users
-   * Retrieves user directory list across all roles.
-   * @returns {Promise<Array>} List<UserResponse> { id, name, email, role }
-   */
   getAllUsers: () => axiosClient.get('/admin/users'),
 
-  /**
-   * Endpoint #46: GET /api/admin/users/{id}
-   * Retrieves single user details by ID.
-   * @param {number|string} id - User ID
-   * @returns {Promise<Object>} UserResponse
-   */
   getUserById: (id) => axiosClient.get(`/admin/users/${id}`),
 
-  /**
-   * Endpoint #47: GET /api/admin/stats
-   * Retrieves system administrative metrics and platform entity counts.
-   * @returns {Promise<Object>} AdminStatsResponse { totalUsers, totalEmployees, totalManagers, totalProjects, openProjects, totalApplications, totalSkills, totalMatchResults }
-   */
+  createEmployee: (data) => axiosClient.post('/admin/employees', data),
+
+  createManager: (data) => axiosClient.post('/admin/managers', data),
+
+  toggleUserStatus: (id, isActive) => axiosClient.put(`/admin/users/${id}/status`, null, { params: { active: isActive } }),
+
+  resetPassword: (id, newPassword) => axiosClient.post(`/admin/users/${id}/reset-password`, { newPassword }),
+
+  deleteUser: (id) => axiosClient.delete(`/admin/users/${id}`),
+
+  getOverview: () => axiosClient.get('/admin/overview'),
+
   getAdminStats: () => axiosClient.get('/admin/stats'),
 };
 

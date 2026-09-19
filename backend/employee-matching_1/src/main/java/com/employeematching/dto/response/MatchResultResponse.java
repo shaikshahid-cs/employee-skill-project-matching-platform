@@ -14,52 +14,34 @@ public class MatchResultResponse {
     private List<String> employeeSkills;
     private Long projectId;
     private String projectTitle;
+
     private double matchScore;
+    private boolean mandatoryPassed;
+
+    // Component normalized scores (0.0 to 1.0)
     private double skillsScore;
     private double experienceScore;
+    private double roleScore;
+    private double educationScore;
     private double certificationScore;
-    private double availabilityScore;
-    private double preferenceScore;
+    private double domainScore;
+
+    // Backward compatibility
+    private double availabilityScore = 1.0;
+    private double preferenceScore = 1.0;
+
+    // Component points earned
+    private double skillsPoints;
+    private double experiencePoints;
+    private double rolePoints;
+    private double educationPoints;
+    private double certificationPoints;
+    private double domainPoints;
+
+    private String matchBreakdownJson;
     private String generatedAt;
 
     public MatchResultResponse() {
-    }
-
-    public MatchResultResponse(
-            Long id,
-            Long employeeId,
-            String employeeName,
-            String employeeEmail,
-            String employeeDesignation,
-            String employeeDepartment,
-            double employeeExperience,
-            List<String> employeeSkills,
-            Long projectId,
-            String projectTitle,
-            double matchScore,
-            double skillsScore,
-            double experienceScore,
-            double certificationScore,
-            double availabilityScore,
-            double preferenceScore,
-            String generatedAt) {
-        this.id = id;
-        this.employeeId = employeeId;
-        this.employeeName = employeeName;
-        this.employeeEmail = employeeEmail;
-        this.employeeDesignation = employeeDesignation;
-        this.employeeDepartment = employeeDepartment;
-        this.employeeExperience = employeeExperience;
-        this.employeeSkills = employeeSkills;
-        this.projectId = projectId;
-        this.projectTitle = projectTitle;
-        this.matchScore = matchScore;
-        this.skillsScore = skillsScore;
-        this.experienceScore = experienceScore;
-        this.certificationScore = certificationScore;
-        this.availabilityScore = availabilityScore;
-        this.preferenceScore = preferenceScore;
-        this.generatedAt = generatedAt;
     }
 
     public Long getId() {
@@ -150,6 +132,14 @@ public class MatchResultResponse {
         this.matchScore = matchScore;
     }
 
+    public boolean isMandatoryPassed() {
+        return mandatoryPassed;
+    }
+
+    public void setMandatoryPassed(boolean mandatoryPassed) {
+        this.mandatoryPassed = mandatoryPassed;
+    }
+
     public double getSkillsScore() {
         return skillsScore;
     }
@@ -166,12 +156,36 @@ public class MatchResultResponse {
         this.experienceScore = experienceScore;
     }
 
+    public double getRoleScore() {
+        return roleScore;
+    }
+
+    public void setRoleScore(double roleScore) {
+        this.roleScore = roleScore;
+    }
+
+    public double getEducationScore() {
+        return educationScore;
+    }
+
+    public void setEducationScore(double educationScore) {
+        this.educationScore = educationScore;
+    }
+
     public double getCertificationScore() {
         return certificationScore;
     }
 
     public void setCertificationScore(double certificationScore) {
         this.certificationScore = certificationScore;
+    }
+
+    public double getDomainScore() {
+        return domainScore;
+    }
+
+    public void setDomainScore(double domainScore) {
+        this.domainScore = domainScore;
     }
 
     public double getAvailabilityScore() {
@@ -188,6 +202,62 @@ public class MatchResultResponse {
 
     public void setPreferenceScore(double preferenceScore) {
         this.preferenceScore = preferenceScore;
+    }
+
+    public double getSkillsPoints() {
+        return skillsPoints;
+    }
+
+    public void setSkillsPoints(double skillsPoints) {
+        this.skillsPoints = skillsPoints;
+    }
+
+    public double getExperiencePoints() {
+        return experiencePoints;
+    }
+
+    public void setExperiencePoints(double experiencePoints) {
+        this.experiencePoints = experiencePoints;
+    }
+
+    public double getRolePoints() {
+        return rolePoints;
+    }
+
+    public void setRolePoints(double rolePoints) {
+        this.rolePoints = rolePoints;
+    }
+
+    public double getEducationPoints() {
+        return educationPoints;
+    }
+
+    public void setEducationPoints(double educationPoints) {
+        this.educationPoints = educationPoints;
+    }
+
+    public double getCertificationPoints() {
+        return certificationPoints;
+    }
+
+    public void setCertificationPoints(double certificationPoints) {
+        this.certificationPoints = certificationPoints;
+    }
+
+    public double getDomainPoints() {
+        return domainPoints;
+    }
+
+    public void setDomainPoints(double domainPoints) {
+        this.domainPoints = domainPoints;
+    }
+
+    public String getMatchBreakdownJson() {
+        return matchBreakdownJson;
+    }
+
+    public void setMatchBreakdownJson(String matchBreakdownJson) {
+        this.matchBreakdownJson = matchBreakdownJson;
     }
 
     public String getGeneratedAt() {

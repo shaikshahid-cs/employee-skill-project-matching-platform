@@ -133,15 +133,9 @@ export default function ManagerDashboardPage() {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
-                  <Link to={`/manager/projects/${proj.id}`} className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.775rem' }}>
-                    Edit & JD Upload
-                  </Link>
-                  <Link to={`/manager/projects/${proj.id}/candidates`} className="btn btn-primary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.775rem' }}>
-                    <Zap size={14} /> Ranked Candidates
-                  </Link>
-                  <Link to={`/manager/projects/${proj.id}/applications`} className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.775rem' }}>
-                    <Users size={14} /> Review Applications
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+                  <Link to={`/manager/projects/${proj.id}`} className="btn btn-primary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}>
+                    <Users size={14} /> Candidate Matching & Team
                   </Link>
                 </div>
               </div>

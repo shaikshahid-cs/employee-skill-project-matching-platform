@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 
 // Protected Route Guard
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -11,16 +11,15 @@ import AdminLayout from '../layouts/AdminLayout';
 
 // Auth Pages
 import LoginPage from '../pages/auth/LoginPage';
-import RegisterPage from '../pages/auth/RegisterPage';
 
 // Employee Pages
 import EmployeeDashboardPage from '../pages/employee/EmployeeDashboardPage';
 import EmployeeProfilePage from '../pages/employee/EmployeeProfilePage';
 import EmployeeSkillsPage from '../pages/employee/EmployeeSkillsPage';
+import EmployeeExperiencePage from '../pages/employee/EmployeeExperiencePage';
 import EmployeeQualificationsPage from '../pages/employee/EmployeeQualificationsPage';
 import ResumeManagerPage from '../pages/employee/ResumeManagerPage';
-import ProjectExplorePage from '../pages/employee/ProjectExplorePage';
-import EmployeeApplicationsPage from '../pages/employee/EmployeeApplicationsPage';
+import EmployeeProjectsPage from '../pages/employee/EmployeeProjectsPage';
 import EmployeeMatchesPage from '../pages/employee/EmployeeMatchesPage';
 
 // Manager Pages
@@ -29,8 +28,6 @@ import ManagerProfilePage from '../pages/manager/ManagerProfilePage';
 import ManagerProjectsPage from '../pages/manager/ManagerProjectsPage';
 import CreateProjectPage from '../pages/manager/CreateProjectPage';
 import ProjectDetailsPage from '../pages/manager/ProjectDetailsPage';
-import ProjectMatchCandidatesPage from '../pages/manager/ProjectMatchCandidatesPage';
-import ProjectApplicationsPage from '../pages/manager/ProjectApplicationsPage';
 
 // Admin Pages
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
@@ -38,6 +35,11 @@ import AdminUserManagementPage from '../pages/admin/AdminUserManagementPage';
 
 // Landing Page
 import LandingPage from '../pages/LandingPage';
+
+function CandidateRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/manager/projects/${id}`} replace />;
+}
 
 export default function AppRoutes() {
   return (
@@ -48,7 +50,7 @@ export default function AppRoutes() {
       {/* Public Auth Routes */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
       </Route>
 
       {/* Protected Employee Portal Routes */}
@@ -57,10 +59,10 @@ export default function AppRoutes() {
           <Route path="dashboard" element={<EmployeeDashboardPage />} />
           <Route path="profile" element={<EmployeeProfilePage />} />
           <Route path="skills" element={<EmployeeSkillsPage />} />
+          <Route path="experience" element={<EmployeeExperiencePage />} />
           <Route path="qualifications" element={<EmployeeQualificationsPage />} />
           <Route path="resume" element={<ResumeManagerPage />} />
-          <Route path="projects" element={<ProjectExplorePage />} />
-          <Route path="applications" element={<EmployeeApplicationsPage />} />
+          <Route path="projects" element={<EmployeeProjectsPage />} />
           <Route path="matches" element={<EmployeeMatchesPage />} />
         </Route>
       </Route>
@@ -73,8 +75,7 @@ export default function AppRoutes() {
           <Route path="projects" element={<ManagerProjectsPage />} />
           <Route path="projects/new" element={<CreateProjectPage />} />
           <Route path="projects/:id" element={<ProjectDetailsPage />} />
-          <Route path="projects/:id/candidates" element={<ProjectMatchCandidatesPage />} />
-          <Route path="projects/:id/applications" element={<ProjectApplicationsPage />} />
+          <Route path="projects/:id/candidates" element={<CandidateRedirect />} />
         </Route>
       </Route>
 
@@ -87,7 +88,6 @@ export default function AppRoutes() {
       </Route>
 
       {/* Fallback Redirects */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

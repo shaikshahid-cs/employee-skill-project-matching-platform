@@ -1,54 +1,27 @@
-import { useState, useEffect } from 'react';
-import { UploadCloud, FileText, Cpu, CheckCircle, AlertCircle, Award, CheckSquare, Square, Save, Eye, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import {
+  UploadCloud, FileText, Cpu, CheckCircle2, AlertCircle, Award,
+  Trash2, Plus, ArrowRight, ShieldCheck, HelpCircle
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
-import resumeApi from '../../api/resumeApi';
-import employeeSkillApi from '../../api/employeeSkillApi';
+import Modal from '../../components/Modal';
+import documentApi from '../../api/documentApi';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'txt'];
 
 export default function ResumeManagerPage() {
-  const [resumes, setResumes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
   const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [processingId, setProcessingId] = useState(null);
-
+  const [extracting, setExtracting] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Extraction Review Workflow State
-  const [reviewState, setReviewState] = useState({
-    active: false,
-    resumeId: null,
-    fileName: '',
-    detectedSkills: [], // [{ name, selected: true, proficiency: 3, yearsExperience: 1.0 }]
-    rawTextPreview: '',
-  });
-
-  const [savingSkills, setSavingSkills] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchResumesData = async () => {
-      try {
-        setLoading(true);
-        const data = await resumeApi.getResumes();
-        if (isMounted) setResumes(Array.isArray(data) ? data : []);
-      } catch {
-        if (isMounted) setResumes([]);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchResumesData();
-    return () => { isMounted = false; };
-  }, [refreshTrigger]);
+  // Review & Verification Modal State
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
 
   const handleFileChange = (e) => {
     setError('');
@@ -56,7 +29,7 @@ export default function ResumeManagerPage() {
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      setError('File size exceeds maximum allowed limit of 5MB.');
+      setError('File size exceeds maximum allowed limit of 10MB.');
       setSelectedFile(null);
       return;
     }
@@ -71,331 +44,410 @@ export default function ResumeManagerPage() {
     setSelectedFile(file);
   };
 
-  const handleUploadSubmit = async (e) => {
+  const handleExtract = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
     if (!selectedFile) {
-      setError('Please select a valid resume document first.');
+      setError('Please select a resume file to parse.');
       return;
     }
 
     try {
-      setUploading(true);
-      const res = await resumeApi.uploadResume(selectedFile);
-      setSuccess(`Resume "${selectedFile.name}" uploaded successfully! Now click "Process & Extract" to review skills.`);
+      setExtracting(true);
+      setError('');
+      setSuccess('');
+      const data = await documentApi.extractResume(selectedFile);
+      setPreviewData(data);
+      setIsPreviewOpen(true);
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Failed to extract data from resume.');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleApplyVerifiedData = async () => {
+    if (!previewData) return;
+    try {
+      setApplying(true);
+      setError('');
+      await documentApi.applyResume(previewData);
+      setSuccess('Resume data reviewed and successfully applied to your professional profile!');
+      setIsPreviewOpen(false);
       setSelectedFile(null);
-      setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
-      setError(err.message || 'Failed to upload resume document.');
+      setError(err?.response?.data?.message || err.message || 'Failed to apply resume profile updates.');
     } finally {
-      setUploading(false);
+      setApplying(false);
     }
   };
 
-  const handleProcessResume = async (resumeId, fileName) => {
-    setError('');
-    setSuccess('');
-
-    try {
-      setProcessingId(resumeId);
-      const res = await resumeApi.processResume(resumeId);
-
-      const rawSkills = Array.isArray(res?.detectedSkills) ? res.detectedSkills : [];
-      const formattedSkills = rawSkills.map((sk) => ({
-        id: sk.id,
-        name: sk.name || sk.skillName || sk,
-        selected: true,
-        proficiency: 3,
-        yearsExperience: 1.0,
-      }));
-
-      setReviewState({
-        active: true,
-        resumeId,
-        fileName: fileName || `Resume #${resumeId}`,
-        detectedSkills: formattedSkills,
-        rawTextPreview: `[Extracted Document Text Preview]\n\nResume parsed successfully from document "${fileName || resumeId}".\nDetected ${formattedSkills.length} relevant technical skills from content analysis. Review and confirm below to update your profile.`,
-      });
-
-      setSuccess(`Resume processed. ${formattedSkills.length} skills extracted. Please review and confirm below.`);
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      setError(err.message || 'Failed to extract skills from resume document.');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleToggleSkill = (index) => {
-    setReviewState((prev) => {
-      const updated = [...prev.detectedSkills];
-      updated[index].selected = !updated[index].selected;
-      return { ...prev, detectedSkills: updated };
+  const updateExtractedSkill = (index, field, value) => {
+    setPreviewData((prev) => {
+      const updatedSkills = [...prev.skills];
+      updatedSkills[index] = { ...updatedSkills[index], [field]: value };
+      return { ...prev, skills: updatedSkills };
     });
   };
 
-  const handleSkillProficiencyChange = (index, val) => {
-    setReviewState((prev) => {
-      const updated = [...prev.detectedSkills];
-      updated[index].proficiency = parseInt(val, 10);
-      return { ...prev, detectedSkills: updated };
+  const removeExtractedSkill = (index) => {
+    setPreviewData((prev) => {
+      const updated = prev.skills.filter((_, i) => i !== index);
+      return { ...prev, skills: updated };
     });
   };
 
-  const handleSaveConfirmedSkills = async () => {
-    setError('');
-    setSuccess('');
-
-    const selectedSkills = reviewState.detectedSkills.filter((s) => s.selected);
-    if (selectedSkills.length === 0) {
-      setError('Please select at least one detected skill to import into your profile.');
-      return;
-    }
-
-    try {
-      setSavingSkills(true);
-      for (const sk of selectedSkills) {
-        await employeeSkillApi.addSkill({
-          skillName: sk.name,
-          proficiency: sk.proficiency,
-          yearsExperience: sk.yearsExperience || 1.0,
-        });
-      }
-
-      setSuccess(`Successfully added ${selectedSkills.length} verified skills to your employee profile!`);
-      setReviewState({ active: false, resumeId: null, fileName: '', detectedSkills: [], rawTextPreview: '' });
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      setError(err.message || 'Failed to save extracted skills to your profile.');
-    } finally {
-      setSavingSkills(false);
+  const getConfidenceBadge = (confidence) => {
+    switch (confidence?.toUpperCase()) {
+      case 'HIGH':
+        return <Badge variant="emerald">HIGH CONFIDENCE</Badge>;
+      case 'MEDIUM':
+        return <Badge variant="amber">MEDIUM</Badge>;
+      case 'LOW':
+      default:
+        return <Badge variant="slate">LOW</Badge>;
     }
   };
 
   return (
     <div>
       <div className="page-header">
-        <h1>Resume Management & Skill Extraction</h1>
-        <p>Upload your resume to extract skills into your profile. Review and confirm before updating your matrix.</p>
+        <h1>Assistive Resume Processing</h1>
+        <p>Upload your resume to extract profile information, technical skills, education, and past work history with human-in-the-loop review.</p>
       </div>
 
       {error && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--error)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          color: '#f87171',
+          fontSize: '0.875rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: 'var(--success)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CheckCircle size={18} />
-          <span>{success}</span>
+        <div style={{
+          padding: '1rem',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          color: '#34d399',
+          fontSize: '0.9rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={20} />
+            <span>{success}</span>
+          </div>
+          <Link to="/employee/profile" className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.825rem' }}>
+            <span>View Updated Profile</span>
+            <ArrowRight size={14} />
+          </Link>
         </div>
       )}
 
-      {/* STEP 1: FILE UPLOAD */}
-      <div className="grid grid-cols-2" style={{ marginBottom: '1.5rem' }}>
-        <Card title="Step 1: Upload Resume Document" subtitle="Supported formats: PDF, DOCX, DOC, TXT (Max 5MB)">
-          <form onSubmit={handleUploadSubmit}>
-            <div style={{
-              border: '2px dashed var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              padding: '2rem 1.5rem',
-              textAlign: 'center',
-              backgroundColor: 'var(--bg-surface)',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              transition: 'border-color 0.2s ease'
-            }}>
-              <UploadCloud size={42} style={{ color: 'var(--primary)', marginBottom: '0.75rem' }} />
-              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                {selectedFile ? selectedFile.name : 'Click or drop resume file here'}
-              </p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>
-                {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOCX, DOC, TXT up to 5MB'}
-              </p>
-              <input
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                onChange={handleFileChange}
-                style={{ marginTop: '0.85rem' }}
-              />
-            </div>
+      <Card title="Upload Document for Assistive Extraction" subtitle="Supports PDF, DOCX, DOC, and TXT files up to 10MB">
+        <form onSubmit={handleExtract}>
+          <div style={{
+            border: '2px dashed var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            backgroundColor: 'var(--bg-surface)',
+            cursor: 'pointer',
+            marginBottom: '1.25rem'
+          }}>
+            <UploadCloud size={48} style={{ color: 'var(--primary)', margin: '0 auto 1rem' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+              Select Resume Document
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+              Apache Tika parses structural metadata, detecting roles, experience periods, degrees, and skills.
+            </p>
 
-            <button type="submit" className="btn btn-primary w-full" disabled={!selectedFile || uploading}>
-              {uploading ? 'Uploading Document...' : 'Upload Resume Document'}
-            </button>
-          </form>
-        </Card>
+            <input
+              type="file"
+              id="resume-file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="resume-file" className="btn btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+              Browse File...
+            </label>
 
-        {/* WORKFLOW SUMMARY */}
-        <Card title="Extraction Workflow Guide" subtitle="How MatchPulse safely extracts skills without corrupting user data">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '0.85rem' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>1</div>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600 }}>Document Parsing</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Apache Tika extracts raw text safely from uploaded PDF or Word documents.</p>
+            {selectedFile && (
+              <div style={{
+                marginTop: '1.25rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: 'rgba(99, 102, 241, 0.15)',
+                borderRadius: '8px',
+                color: 'var(--primary)',
+                fontWeight: 500,
+                fontSize: '0.875rem'
+              }}>
+                <FileText size={16} />
+                <span>{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
               </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.85rem' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(6, 182, 212, 0.15)', color: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>2</div>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600 }}>Skill Recognition</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Regex boundary pattern matching identifies technical skills registered in database.</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.85rem' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>3</div>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600 }}>Employee Review & Confirmation</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Review extracted skills, set proficiency ratings, and confirm before saving.</p>
-              </div>
-            </div>
+            )}
           </div>
-        </Card>
-      </div>
 
-      {/* STEP 2: INTERACTIVE SKILL REVIEW PANEL */}
-      {reviewState.active && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <Card
-            title={`Step 2: Review Extracted Information — ${reviewState.fileName}`}
-            subtitle="Select verified skills and assign proficiency ratings before saving to your profile matrix"
-            action={
-              <button className="btn btn-secondary" onClick={() => setReviewState({ active: false, resumeId: null, fileName: '', detectedSkills: [], rawTextPreview: '' })}>
-                Close Preview
-              </button>
-            }
-          >
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>
-                Extracted Content Summary:
-              </label>
-              <textarea
-                readOnly
-                value={reviewState.rawTextPreview}
-                style={{ width: '100%', height: '80px', background: 'var(--bg-base)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.65rem', color: 'var(--text-dim)', fontSize: '0.825rem', fontFamily: 'monospace' }}
-              />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!selectedFile || extracting}
+              style={{ minWidth: '180px' }}
+            >
+              {extracting ? (
+                <>
+                  <Cpu size={16} className="animate-spin" />
+                  <span>Analyzing Resume...</span>
+                </>
+              ) : (
+                <>
+                  <Cpu size={16} />
+                  <span>Extract & Review Preview</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Card>
+
+      {/* VERIFICATION & PREVIEW MODAL */}
+      <Modal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title="Review Extracted Resume Data (Assistive Preview)"
+      >
+        {previewData && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxHeight: '70vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
+            {/* Warning Banner */}
+            <div style={{
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.75rem',
+              fontSize: '0.85rem',
+              color: '#93c5fd'
+            }}>
+              <ShieldCheck size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>Assistive AI Extraction — Human Verification Required:</strong>
+                <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)' }}>
+                  Review and edit any extracted values below. No changes are applied to your profile until you click "Confirm & Apply to Profile".
+                </p>
+              </div>
             </div>
 
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Cpu size={18} style={{ color: 'var(--primary)' }} />
-              Detected Skills ({reviewState.detectedSkills.length} identified):
-            </h4>
+            {/* Extracted Personal Info */}
+            <div style={{ background: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.75rem' }}>
+                Personal Information Detected
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Full Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={previewData.fullName?.value || ''}
+                    onChange={(e) => setPreviewData({ ...previewData, fullName: { ...previewData.fullName, value: e.target.value } })}
+                  />
+                  <div style={{ marginTop: '0.25rem' }}>{getConfidenceBadge(previewData.fullName?.confidence)}</div>
+                </div>
 
-            {reviewState.detectedSkills.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No skills automatically detected from document text.</p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-                {reviewState.detectedSkills.map((sk, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.75rem',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: sk.selected ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-surface)',
-                      border: sk.selected ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid var(--border-color)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }} onClick={() => handleToggleSkill(idx)}>
-                      {sk.selected ? <CheckSquare size={18} style={{ color: 'var(--primary)' }} /> : <Square size={18} style={{ color: 'var(--text-dim)' }} />}
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: sk.selected ? 'var(--text-main)' : 'var(--text-muted)' }}>{sk.name}</span>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Phone</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={previewData.phone?.value || ''}
+                    onChange={(e) => setPreviewData({ ...previewData, phone: { ...previewData.phone, value: e.target.value } })}
+                  />
+                  <div style={{ marginTop: '0.25rem' }}>{getConfidenceBadge(previewData.phone?.confidence)}</div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Designation / Title</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={previewData.designation?.value || ''}
+                    onChange={(e) => setPreviewData({ ...previewData, designation: { ...previewData.designation, value: e.target.value } })}
+                  />
+                  <div style={{ marginTop: '0.25rem' }}>{getConfidenceBadge(previewData.designation?.confidence)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Extracted Skills */}
+            <div style={{ background: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Detected Technical Skills ({previewData.skills?.length || 0})
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Set your actual proficiency (1-5)</span>
+              </div>
+
+              {previewData.skills?.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>No skills detected automatically.</p>
+              ) : (
+                <div className="table-container" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <table className="table" style={{ fontSize: '0.825rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Skill</th>
+                        <th>Proficiency (1-5)</th>
+                        <th>Experience (Yrs)</th>
+                        <th>Confidence</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.skills?.map((s, idx) => (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 600 }}>{s.skillName}</td>
+                          <td>
+                            <select
+                              className="form-input"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', width: 'auto' }}
+                              value={s.proficiency || 3}
+                              onChange={(e) => updateExtractedSkill(idx, 'proficiency', parseInt(e.target.value, 10))}
+                            >
+                              <option value="1">1 - Novice</option>
+                              <option value="2">2 - Elementary</option>
+                              <option value="3">3 - Competent</option>
+                              <option value="4">4 - Advanced</option>
+                              <option value="5">5 - Expert</option>
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              className="form-input"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', width: '70px' }}
+                              value={s.yearsOfExperience || 1}
+                              onChange={(e) => updateExtractedSkill(idx, 'yearsOfExperience', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td>{getConfidenceBadge(s.confidence)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.4rem', color: '#f87171' }}
+                              onClick={() => removeExtractedSkill(idx)}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Extracted Education */}
+            {previewData.education?.length > 0 && (
+              <div style={{ background: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                  Extracted Education Records ({previewData.education.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {previewData.education.map((edu, idx) => (
+                    <div key={idx} style={{ padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{edu.degree}</span>
+                      <span style={{ color: 'var(--text-dim)', margin: '0 0.5rem' }}>&bull;</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{edu.institution} ({edu.graduationYear || 'Year N/A'})</span>
                     </div>
-
-                    {sk.selected && (
-                      <select
-                        value={sk.proficiency}
-                        onChange={(e) => handleSkillProficiencyChange(idx, e.target.value)}
-                        style={{ padding: '0.25rem 0.5rem', background: 'var(--bg-base)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px', fontSize: '0.775rem' }}
-                      >
-                        <option value="1">L1 - Basic</option>
-                        <option value="2">L2 - Intermediate</option>
-                        <option value="3">L3 - Proficient</option>
-                        <option value="4">L4 - Advanced</option>
-                        <option value="5">L5 - Expert</option>
-                      </select>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            {/* Extracted Certifications */}
+            {previewData.certifications?.length > 0 && (
+              <div style={{ background: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                  Extracted Certifications ({previewData.certifications.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {previewData.certifications.map((c, idx) => (
+                    <div key={idx} style={{ padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{c.name}</span>
+                      <span style={{ color: 'var(--text-dim)', margin: '0 0.5rem' }}>&bull;</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{c.issuingOrganization || 'Authority'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Extracted Experience */}
+            {previewData.experience?.length > 0 && (
+              <div style={{ background: 'var(--bg-surface)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                  Extracted Work History ({previewData.experience.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {previewData.experience.map((exp, idx) => (
+                    <div key={idx} style={{ padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{exp.roleTitle}</span>
+                      <span style={{ color: 'var(--text-dim)' }}> at </span>
+                      <strong style={{ color: 'var(--primary)' }}>{exp.company}</strong>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: '0.5rem' }}>({exp.startDate} - {exp.current ? 'Present' : (exp.endDate || '')})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
               <button
-                className="btn btn-primary"
-                onClick={handleSaveConfirmedSkills}
-                disabled={savingSkills || reviewState.detectedSkills.filter(s => s.selected).length === 0}
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsPreviewOpen(false)}
               >
-                <Save size={16} />
-                <span>{savingSkills ? 'Saving Verified Skills...' : 'Confirm & Import to My Profile'}</span>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={applying}
+                onClick={handleApplyVerifiedData}
+              >
+                {applying ? 'Applying Updates...' : 'Confirm & Apply to Profile'}
               </button>
             </div>
-          </Card>
-        </div>
-      )}
-
-      {/* UPLOADED RESUMES LIST CARD */}
-      <Card title="Stored Resume Documents" subtitle="Manage uploaded resumes and trigger automated text parsing">
-        {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading resume documents...</div>
-        ) : resumes.length === 0 ? (
-          <div className="empty-state">
-            <FileText size={36} />
-            <h3>No resumes uploaded yet</h3>
-            <p>Upload a document above to extract skills and enhance your candidate matching score.</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>File Name</th>
-                  <th>Uploaded At</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resumes.map((doc) => (
-                  <tr key={doc.id}>
-                    <td style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <FileText size={18} style={{ color: 'var(--primary)' }} />
-                      <span>{doc.fileName}</span>
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'Stored'}
-                    </td>
-                    <td>
-                      <Badge variant={doc.processingStatus === 'PROCESSED' ? 'success' : 'amber'}>
-                        {doc.processingStatus}
-                      </Badge>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
-                        onClick={() => handleProcessResume(doc.id, doc.fileName)}
-                        disabled={processingId === doc.id}
-                      >
-                        <Cpu size={14} />
-                        <span>{processingId === doc.id ? 'Parsing Document...' : 'Process & Review Skills'}</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
-      </Card>
+      </Modal>
     </div>
   );
 }

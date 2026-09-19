@@ -6,21 +6,19 @@ import com.employeematching.service.CertificationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.core.Authentication;
-
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/certifications")
+@RequestMapping({"/api/employee/certifications", "/api/certifications"})
 public class CertificationController {
 
     private final CertificationService certificationService;
 
-    public CertificationController(
-            CertificationService certificationService) {
-
+    public CertificationController(CertificationService certificationService) {
         this.certificationService = certificationService;
     }
 
@@ -28,32 +26,20 @@ public class CertificationController {
     public ResponseEntity<CertificationResponse> addCertification(
             @Valid @RequestBody CertificationRequest request,
             Authentication authentication) {
-
-        CertificationResponse response =
-                certificationService.addCertification(request, authentication);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        CertificationResponse response = certificationService.addCertification(request, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<CertificationResponse>> getMyCertifications(
-            Authentication authentication) {
-
-        return ResponseEntity.ok(
-                certificationService.getMyCertifications(authentication)
-        );
+    public ResponseEntity<List<CertificationResponse>> getMyCertifications(Authentication authentication) {
+        return ResponseEntity.ok(certificationService.getMyCertifications(authentication));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<CertificationResponse> getCertificationById(
             @PathVariable Long id,
             Authentication authentication) {
-
-        return ResponseEntity.ok(
-                certificationService.getCertificationById(id, authentication)
-        );
+        return ResponseEntity.ok(certificationService.getCertificationById(id, authentication));
     }
 
     @PutMapping("/{id}")
@@ -61,19 +47,14 @@ public class CertificationController {
             @PathVariable Long id,
             @Valid @RequestBody CertificationRequest request,
             Authentication authentication) {
-
-        return ResponseEntity.ok(
-                certificationService.updateCertification(id, request, authentication)
-        );
+        return ResponseEntity.ok(certificationService.updateCertification(id, request, authentication));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCertification(
+    public ResponseEntity<Map<String, String>> deleteCertification(
             @PathVariable Long id,
             Authentication authentication) {
-
         certificationService.deleteCertification(id, authentication);
-
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Map.of("message", "Certification deleted successfully"));
     }
 }

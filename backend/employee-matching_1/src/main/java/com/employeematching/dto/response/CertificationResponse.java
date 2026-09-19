@@ -3,29 +3,28 @@ package com.employeematching.dto.response;
 public class CertificationResponse {
 
     private Long id;
-    private Long employeeId;
     private String name;
     private String issuingOrganization;
     private String issueDate;
     private String expiryDate;
+    private String credentialId;
 
     public CertificationResponse() {
     }
 
     public CertificationResponse(
             Long id,
-            Long employeeId,
             String name,
             String issuingOrganization,
             String issueDate,
-            String expiryDate) {
-
+            String expiryDate,
+            String credentialId) {
         this.id = id;
-        this.employeeId = employeeId;
         this.name = name;
         this.issuingOrganization = issuingOrganization;
         this.issueDate = issueDate;
         this.expiryDate = expiryDate;
+        this.credentialId = credentialId;
     }
 
     public Long getId() {
@@ -34,14 +33,6 @@ public class CertificationResponse {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public Long getEmployeeId() {
-        return employeeId;
-    }
-
-    public void setEmployeeId(Long employeeId) {
-        this.employeeId = employeeId;
     }
 
     public String getName() {
@@ -74,5 +65,13 @@ public class CertificationResponse {
 
     public void setExpiryDate(String expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public String getCredentialId() {
+        return credentialId;
+    }
+
+    public void setCredentialId(String credentialId) {
+        this.credentialId = credentialId;
     }
 }

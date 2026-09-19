@@ -8,6 +8,10 @@ public class ProjectSkillResponse {
     private String skillName;
     private int requiredProficiency;
     private int importance;
+    private boolean isMandatory;
+
+    public ProjectSkillResponse() {
+    }
 
     public ProjectSkillResponse(
             Long id,
@@ -15,14 +19,15 @@ public class ProjectSkillResponse {
             Long skillId,
             String skillName,
             int requiredProficiency,
-            int importance) {
-
+            int importance,
+            boolean isMandatory) {
         this.id = id;
         this.projectId = projectId;
         this.skillId = skillId;
         this.skillName = skillName;
         this.requiredProficiency = requiredProficiency;
         this.importance = importance;
+        this.isMandatory = isMandatory;
     }
 
     public Long getId() {
@@ -45,7 +50,15 @@ public class ProjectSkillResponse {
         return requiredProficiency;
     }
 
+    public int getMinProficiency() {
+        return requiredProficiency;
+    }
+
     public int getImportance() {
         return importance;
+    }
+
+    public boolean isMandatory() {
+        return isMandatory;
     }
 }

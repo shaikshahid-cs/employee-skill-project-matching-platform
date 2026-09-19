@@ -13,8 +13,8 @@ export function AuthProvider({ children }) {
   });
 
   const login = (loginData) => {
-    const { token: jwtToken, id, name, email, role } = loginData;
-    const userData = { id, name, email, role };
+    const { token: jwtToken, id, name, email, role, mustChangePassword } = loginData;
+    const userData = { id, name, email, role, mustChangePassword: Boolean(mustChangePassword) };
 
     localStorage.setItem('token', jwtToken);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -23,6 +23,14 @@ export function AuthProvider({ children }) {
     setUser(userData);
 
     return userData;
+  };
+
+  const updateUser = (updatedFields) => {
+    setUser((prev) => {
+      const updated = { ...prev, ...updatedFields };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const logout = () => {
@@ -49,6 +57,7 @@ export function AuthProvider({ children }) {
     token,
     loading: false,
     login,
+    updateUser,
     logout,
     isAuthenticated: Boolean(token && user),
     isEmployee: user?.role === 'EMPLOYEE',

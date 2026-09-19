@@ -5,82 +5,89 @@ import com.employeematching.dto.response.ManagerProfileResponse;
 import com.employeematching.entity.Manager;
 import com.employeematching.entity.User;
 import com.employeematching.repository.ManagerRepository;
+import com.employeematching.repository.ProjectRepository;
 import com.employeematching.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ManagerService {
 
     private final ManagerRepository managerRepository;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
 
     public ManagerService(
             ManagerRepository managerRepository,
-            UserRepository userRepository) {
-
+            UserRepository userRepository,
+            ProjectRepository projectRepository) {
         this.managerRepository = managerRepository;
         this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
     }
 
-    public ManagerProfileResponse createProfile(
+    public ManagerProfileResponse getMyProfile(Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+
+        Manager manager = managerRepository.findByUserId(user.getId())
+                .orElseGet(() -> {
+                    Manager m = new Manager();
+                    m.setUser(user);
+                    return managerRepository.save(m);
+                });
+
+        return mapToResponse(manager);
+    }
+
+    @Transactional
+    public ManagerProfileResponse updateProfile(
             ManagerProfileRequest request,
             Authentication authentication) {
 
         User user = getAuthenticatedUser(authentication);
 
-        if (user.getRole() != User.Role.MANAGER) {
-            throw new RuntimeException("Only users with MANAGER role can create a manager profile");
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            user.setFullName(request.getFullName().trim());
+            userRepository.save(user);
         }
-
-        if (managerRepository.findByUserId(user.getId()).isPresent()) {
-            throw new RuntimeException("Manager profile already exists");
-        }
-
-        Manager manager = new Manager();
-
-        manager.setUser(user);
-        manager.setDepartment(request.getDepartment());
-        manager.setDesignation(request.getDesignation());
-
-        Manager savedManager = managerRepository.save(manager);
-
-        return mapToResponse(savedManager);
-    }
-
-    public ManagerProfileResponse getMyProfile(
-            Authentication authentication) {
-
-        User user = getAuthenticatedUser(authentication);
 
         Manager manager = managerRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Manager profile not found"));
+                .orElseGet(() -> {
+                    Manager m = new Manager();
+                    m.setUser(user);
+                    return m;
+                });
 
-        return mapToResponse(manager);
+        if (request.getDepartment() != null) {
+            manager.setDepartment(request.getDepartment().trim());
+        }
+        if (request.getPhone() != null) {
+            manager.setPhone(request.getPhone().trim());
+        }
+
+        Manager saved = managerRepository.save(manager);
+        return mapToResponse(saved);
     }
 
-    private User getAuthenticatedUser(
-            Authentication authentication) {
-
+    private User getAuthenticatedUser(Authentication authentication) {
         String email = authentication.getName();
-
         return userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("Authenticated user not found"));
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
     }
 
     private ManagerProfileResponse mapToResponse(Manager manager) {
-
         User user = manager.getUser();
+        int projectsCount = (int) projectRepository.findByManagerId(manager.getId()).size();
 
         return new ManagerProfileResponse(
                 manager.getId(),
                 user.getId(),
-                user.getName(),
+                user.getFullName(),
                 user.getEmail(),
                 manager.getDepartment(),
-                manager.getDesignation()
+                manager.getPhone(),
+                projectsCount
         );
     }
 }

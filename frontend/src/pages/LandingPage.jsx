@@ -58,14 +58,9 @@ export default function LandingPage() {
               Go to Portal <ArrowRight size={16} />
             </Link>
           ) : (
-            <>
-              <Link to="/login" className="btn btn-secondary">
-                Sign In
-              </Link>
-              <Link to="/register" className="btn btn-primary">
-                Get Started <ArrowRight size={16} />
-              </Link>
-            </>
+            <Link to="/login" className="btn btn-primary">
+              Enterprise Sign In <ArrowRight size={16} />
+            </Link>
           )}
         </div>
       </header>
@@ -119,11 +114,8 @@ export default function LandingPage() {
           </p>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '0.85rem 1.85rem', fontSize: '1rem', fontWeight: 600 }}>
-              Join as Employee / Manager <ArrowRight size={18} />
-            </Link>
-            <Link to="/login" className="btn btn-secondary" style={{ padding: '0.85rem 1.85rem', fontSize: '1rem' }}>
-              Sign In to Portal
+            <Link to="/login" className="btn btn-primary" style={{ padding: '0.85rem 1.85rem', fontSize: '1rem', fontWeight: 600 }}>
+              Access Enterprise Portal <ArrowRight size={18} />
             </Link>
           </div>
         </div>

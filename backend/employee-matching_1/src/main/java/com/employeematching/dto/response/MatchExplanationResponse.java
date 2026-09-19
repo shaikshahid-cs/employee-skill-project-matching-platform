@@ -1,5 +1,6 @@
 package com.employeematching.dto.response;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class MatchExplanationResponse {
@@ -12,77 +13,45 @@ public class MatchExplanationResponse {
     private String employeeDepartment;
     private Long projectId;
     private String projectTitle;
+
     private double overallMatchScore;
+    private boolean mandatoryPassed = true;
+    private List<String> failedMandatoryReasons = new ArrayList<>();
 
     // Component Scores (0.0 to 1.0)
     private double skillsScore;
     private double experienceScore;
+    private double roleScore;
+    private double educationScore;
     private double certificationScore;
-    private double availabilityScore;
-    private double preferenceScore;
+    private double domainScore;
 
-    // Component Points out of Weight Max (50, 30, 10, 5, 5)
+    // Component Points out of Weight Max (35, 20, 15, 12, 10, 8)
     private double skillsPoints;
     private double experiencePoints;
+    private double rolePoints;
+    private double educationPoints;
     private double certificationPoints;
-    private double availabilityPoints;
-    private double preferencePoints;
+    private double domainPoints;
+
+    // Backward compatibility fields
+    private double availabilityScore = 1.0;
+    private double preferenceScore = 1.0;
+    private double availabilityPoints = 0.0;
+    private double preferencePoints = 0.0;
 
     // Detailed Skill Breakdown
-    private List<String> matchedSkills;
-    private List<String> missingSkills;
+    private List<String> matchedSkills = new ArrayList<>();
+    private List<String> missingSkills = new ArrayList<>();
 
+    // Qualitative Explanation
+    private List<String> strengths = new ArrayList<>();
+    private List<String> missingOrGaps = new ArrayList<>();
+
+    private String matchBreakdownJson;
     private String generatedAt;
 
     public MatchExplanationResponse() {
-    }
-
-    public MatchExplanationResponse(
-            Long matchResultId,
-            Long employeeId,
-            String employeeName,
-            String employeeEmail,
-            String employeeDesignation,
-            String employeeDepartment,
-            Long projectId,
-            String projectTitle,
-            double overallMatchScore,
-            double skillsScore,
-            double experienceScore,
-            double certificationScore,
-            double availabilityScore,
-            double preferenceScore,
-            double skillsPoints,
-            double experiencePoints,
-            double certificationPoints,
-            double availabilityPoints,
-            double preferencePoints,
-            List<String> matchedSkills,
-            List<String> missingSkills,
-            String generatedAt) {
-
-        this.matchResultId = matchResultId;
-        this.employeeId = employeeId;
-        this.employeeName = employeeName;
-        this.employeeEmail = employeeEmail;
-        this.employeeDesignation = employeeDesignation;
-        this.employeeDepartment = employeeDepartment;
-        this.projectId = projectId;
-        this.projectTitle = projectTitle;
-        this.overallMatchScore = overallMatchScore;
-        this.skillsScore = skillsScore;
-        this.experienceScore = experienceScore;
-        this.certificationScore = certificationScore;
-        this.availabilityScore = availabilityScore;
-        this.preferenceScore = preferenceScore;
-        this.skillsPoints = skillsPoints;
-        this.experiencePoints = experiencePoints;
-        this.certificationPoints = certificationPoints;
-        this.availabilityPoints = availabilityPoints;
-        this.preferencePoints = preferencePoints;
-        this.matchedSkills = matchedSkills;
-        this.missingSkills = missingSkills;
-        this.generatedAt = generatedAt;
     }
 
     public Long getMatchResultId() {
@@ -157,6 +126,22 @@ public class MatchExplanationResponse {
         this.overallMatchScore = overallMatchScore;
     }
 
+    public boolean isMandatoryPassed() {
+        return mandatoryPassed;
+    }
+
+    public void setMandatoryPassed(boolean mandatoryPassed) {
+        this.mandatoryPassed = mandatoryPassed;
+    }
+
+    public List<String> getFailedMandatoryReasons() {
+        return failedMandatoryReasons;
+    }
+
+    public void setFailedMandatoryReasons(List<String> failedMandatoryReasons) {
+        this.failedMandatoryReasons = failedMandatoryReasons;
+    }
+
     public double getSkillsScore() {
         return skillsScore;
     }
@@ -173,6 +158,22 @@ public class MatchExplanationResponse {
         this.experienceScore = experienceScore;
     }
 
+    public double getRoleScore() {
+        return roleScore;
+    }
+
+    public void setRoleScore(double roleScore) {
+        this.roleScore = roleScore;
+    }
+
+    public double getEducationScore() {
+        return educationScore;
+    }
+
+    public void setEducationScore(double educationScore) {
+        this.educationScore = educationScore;
+    }
+
     public double getCertificationScore() {
         return certificationScore;
     }
@@ -181,20 +182,12 @@ public class MatchExplanationResponse {
         this.certificationScore = certificationScore;
     }
 
-    public double getAvailabilityScore() {
-        return availabilityScore;
+    public double getDomainScore() {
+        return domainScore;
     }
 
-    public void setAvailabilityScore(double availabilityScore) {
-        this.availabilityScore = availabilityScore;
-    }
-
-    public double getPreferenceScore() {
-        return preferenceScore;
-    }
-
-    public void setPreferenceScore(double preferenceScore) {
-        this.preferenceScore = preferenceScore;
+    public void setDomainScore(double domainScore) {
+        this.domainScore = domainScore;
     }
 
     public double getSkillsPoints() {
@@ -213,12 +206,52 @@ public class MatchExplanationResponse {
         this.experiencePoints = experiencePoints;
     }
 
+    public double getRolePoints() {
+        return rolePoints;
+    }
+
+    public void setRolePoints(double rolePoints) {
+        this.rolePoints = rolePoints;
+    }
+
+    public double getEducationPoints() {
+        return educationPoints;
+    }
+
+    public void setEducationPoints(double educationPoints) {
+        this.educationPoints = educationPoints;
+    }
+
     public double getCertificationPoints() {
         return certificationPoints;
     }
 
     public void setCertificationPoints(double certificationPoints) {
         this.certificationPoints = certificationPoints;
+    }
+
+    public double getDomainPoints() {
+        return domainPoints;
+    }
+
+    public void setDomainPoints(double domainPoints) {
+        this.domainPoints = domainPoints;
+    }
+
+    public double getAvailabilityScore() {
+        return availabilityScore;
+    }
+
+    public void setAvailabilityScore(double availabilityScore) {
+        this.availabilityScore = availabilityScore;
+    }
+
+    public double getPreferenceScore() {
+        return preferenceScore;
+    }
+
+    public void setPreferenceScore(double preferenceScore) {
+        this.preferenceScore = preferenceScore;
     }
 
     public double getAvailabilityPoints() {
@@ -251,6 +284,30 @@ public class MatchExplanationResponse {
 
     public void setMissingSkills(List<String> missingSkills) {
         this.missingSkills = missingSkills;
+    }
+
+    public List<String> getStrengths() {
+        return strengths;
+    }
+
+    public void setStrengths(List<String> strengths) {
+        this.strengths = strengths;
+    }
+
+    public List<String> getMissingOrGaps() {
+        return missingOrGaps;
+    }
+
+    public void setMissingOrGaps(List<String> missingOrGaps) {
+        this.missingOrGaps = missingOrGaps;
+    }
+
+    public String getMatchBreakdownJson() {
+        return matchBreakdownJson;
+    }
+
+    public void setMatchBreakdownJson(String matchBreakdownJson) {
+        this.matchBreakdownJson = matchBreakdownJson;
     }
 
     public String getGeneratedAt() {

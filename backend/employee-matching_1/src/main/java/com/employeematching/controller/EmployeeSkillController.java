@@ -10,9 +10,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/employees/skills")
+@RequestMapping({"/api/employee/skills", "/api/employees/skills"})
 public class EmployeeSkillController {
 
     private final EmployeeSkillService employeeSkillService;
@@ -21,25 +22,32 @@ public class EmployeeSkillController {
         this.employeeSkillService = employeeSkillService;
     }
 
+    @GetMapping
+    public ResponseEntity<List<EmployeeSkillResponse>> getMySkills(Authentication authentication) {
+        return ResponseEntity.ok(employeeSkillService.getMySkills(authentication));
+    }
+
     @PostMapping
     public ResponseEntity<EmployeeSkillResponse> addSkill(
             @Valid @RequestBody EmployeeSkillRequest request,
             Authentication authentication) {
-
-        EmployeeSkillResponse response =
-                employeeSkillService.addSkill(request, authentication);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        EmployeeSkillResponse response = employeeSkillService.addSkill(request, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping
-    public ResponseEntity<List<EmployeeSkillResponse>> getMySkills(
+    @PutMapping("/{id}")
+    public ResponseEntity<EmployeeSkillResponse> updateSkill(
+            @PathVariable Long id,
+            @Valid @RequestBody EmployeeSkillRequest request,
             Authentication authentication) {
+        return ResponseEntity.ok(employeeSkillService.updateSkill(id, request, authentication));
+    }
 
-        return ResponseEntity.ok(
-                employeeSkillService.getMySkills(authentication)
-        );
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, String>> deleteSkill(
+            @PathVariable Long id,
+            Authentication authentication) {
+        employeeSkillService.deleteSkill(id, authentication);
+        return ResponseEntity.ok(Map.of("message", "Skill removed successfully"));
     }
 }

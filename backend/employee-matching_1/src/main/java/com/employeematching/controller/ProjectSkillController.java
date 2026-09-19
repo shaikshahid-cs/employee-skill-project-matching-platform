@@ -10,9 +10,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/managers/project-skills")
+@RequestMapping({"/api/manager/project-skills", "/api/managers/project-skills"})
 public class ProjectSkillController {
 
     private final ProjectSkillService projectSkillService;
@@ -25,29 +26,15 @@ public class ProjectSkillController {
     public ResponseEntity<ProjectSkillResponse> addRequiredSkill(
             @Valid @RequestBody ProjectSkillRequest request,
             Authentication authentication) {
-
-        ProjectSkillResponse response =
-                projectSkillService.addRequiredSkill(
-                        request,
-                        authentication
-                );
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        ProjectSkillResponse response = projectSkillService.addRequiredSkill(request, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<ProjectSkillResponse>> getProjectSkills(
             @PathVariable Long projectId,
             Authentication authentication) {
-
-        return ResponseEntity.ok(
-                projectSkillService.getProjectSkills(
-                        projectId,
-                        authentication
-                )
-        );
+        return ResponseEntity.ok(projectSkillService.getProjectSkills(projectId, authentication));
     }
 
     @PutMapping("/{id}")
@@ -55,13 +42,14 @@ public class ProjectSkillController {
             @PathVariable Long id,
             @Valid @RequestBody ProjectSkillRequest request,
             Authentication authentication) {
+        return ResponseEntity.ok(projectSkillService.updateRequiredSkill(id, request, authentication));
+    }
 
-        return ResponseEntity.ok(
-                projectSkillService.updateRequiredSkill(
-                        id,
-                        request,
-                        authentication
-                )
-        );
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, String>> removeRequiredSkill(
+            @PathVariable Long id,
+            Authentication authentication) {
+        projectSkillService.removeRequiredSkill(id, authentication);
+        return ResponseEntity.ok(Map.of("message", "Skill requirement removed successfully"));
     }
 }

@@ -1,53 +1,63 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Award, Clock, Briefcase, ChevronRight, AlertCircle, Sparkles, CheckCircle2, ArrowUpRight, FileText, FolderGit2 } from 'lucide-react';
+import {
+  User, Award, Clock, Briefcase, ChevronRight, AlertCircle,
+  CheckCircle2, ArrowUpRight, FileText, Sparkles, GraduationCap, Eye
+} from 'lucide-react';
 import StatCard from '../../components/ui/StatCard';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import MatchExplanationModal from '../../components/MatchExplanationModal';
 import { useAuth } from '../../context/useAuth';
 import employeeApi from '../../api/employeeApi';
 import employeeSkillApi from '../../api/employeeSkillApi';
-import applicationApi from '../../api/applicationApi';
+import { qualificationApi, experienceApi } from '../../api/qualificationApi';
 import projectApi from '../../api/projectApi';
-import resumeApi from '../../api/resumeApi';
 
 export default function EmployeeDashboardPage() {
   const { user } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [skills, setSkills] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [resumes, setResumes] = useState([]);
-  const [applications, setApplications] = useState([]);
+  const [experiences, setExperiences] = useState([]);
+  const [educations, setEducations] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Explain modal state
+  const [selectedMatchId, setSelectedMatchId] = useState(null);
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const [profData, skillData, projData, resData, appData, recData] = await Promise.allSettled([
+        const [profData, skillData, expData, eduData, certData, assignData, recData] = await Promise.allSettled([
           employeeApi.getProfile(),
           employeeSkillApi.getSkills(),
-          Promise.resolve([]),
-          resumeApi.getResumes(),
-          applicationApi.getMyApplications(),
+          experienceApi.getExperiences(),
+          qualificationApi.getEducations(),
+          qualificationApi.getCertifications(),
+          projectApi.getMyAssignedProjects(),
           projectApi.getRecommendedProjects(),
         ]);
 
         if (isMounted) {
           if (profData.status === 'fulfilled') setProfile(profData.value);
           if (skillData.status === 'fulfilled' && Array.isArray(skillData.value)) setSkills(skillData.value);
-          if (projData.status === 'fulfilled' && Array.isArray(projData.value)) setProjects(projData.value);
-          if (resData.status === 'fulfilled' && Array.isArray(resData.value)) setResumes(resData.value);
-          if (appData.status === 'fulfilled' && Array.isArray(appData.value)) setApplications(appData.value);
+          if (expData.status === 'fulfilled' && Array.isArray(expData.value)) setExperiences(expData.value);
+          if (eduData.status === 'fulfilled' && Array.isArray(eduData.value)) setEducations(eduData.value);
+          if (certData.status === 'fulfilled' && Array.isArray(certData.value)) setCertifications(certData.value);
+          if (assignData.status === 'fulfilled' && Array.isArray(assignData.value)) setAssignments(assignData.value);
           if (recData.status === 'fulfilled' && Array.isArray(recData.value)) setRecommendations(recData.value);
         }
       } catch (err) {
-        if (isMounted) setError(err.message || 'Failed to load dashboard metrics.');
+        if (isMounted) setError(err?.response?.data?.message || err.message || 'Failed to load dashboard metrics.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -57,27 +67,23 @@ export default function EmployeeDashboardPage() {
     return () => { isMounted = false; };
   }, []);
 
-  // Calculate profile completeness
+  // Completeness score
   const missingItems = [];
   let completionScore = 0;
 
-  if (profile?.department && profile?.designation) completionScore += 30;
-  else missingItems.push('Basic Profile Info (Department & Designation)');
+  if (profile?.designation && profile?.primaryDomain) completionScore += 25;
+  else missingItems.push('Designation & Primary Domain');
 
   if (skills.length > 0) completionScore += 25;
-  else missingItems.push('Skills Matrix (Add at least 1 skill)');
+  else missingItems.push('Technical Skills (Add at least 1 skill)');
 
-  if (projects.length > 0) completionScore += 25;
-  else missingItems.push('Project Experience (Add at least 1 project)');
+  if (experiences.length > 0) completionScore += 25;
+  else missingItems.push('Work History (Add past positions)');
 
-  if (resumes.length > 0) completionScore += 20;
-  else missingItems.push('Resume Document (Upload & parse resume)');
+  if (educations.length > 0 || certifications.length > 0) completionScore += 25;
+  else missingItems.push('Education & Certifications');
 
-  const getMatchPercent = (val) => {
-    if (val === undefined || val === null) return 0;
-    if (val <= 1.0) return Math.round(val * 100);
-    return Math.round(val);
-  };
+  const topMatch = recommendations.length > 0 ? Math.round(recommendations[0].matchScore) : 0;
 
   return (
     <div>
@@ -92,119 +98,203 @@ export default function EmployeeDashboardPage() {
           </p>
         </div>
 
-        <Link to="/employee/projects" className="btn btn-primary">
-          <Briefcase size={16} /> Explore Open Opportunities
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <Link to="/employee/resume" className="btn btn-secondary">
+            <FileText size={16} /> Assistive Resume Import
+          </Link>
+          <Link to="/employee/projects" className="btn btn-primary">
+            <Briefcase size={16} /> My Assigned Projects
+          </Link>
+        </div>
       </div>
 
       {error && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--error)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <AlertCircle size={18} />
-          <span>{error}</span>
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          color: '#f87171',
+          fontSize: '0.85rem',
+          marginBottom: '1.25rem'
+        }}>
+          {error}
         </div>
       )}
 
-      {/* PROFILE COMPLETENESS BANNER */}
-      {!loading && completionScore < 100 && (
-        <div className="glass-card" style={{ marginBottom: '1.5rem', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ flex: 1, minWidth: '280px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <Sparkles size={18} style={{ color: 'var(--primary)' }} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Profile Completeness: {completionScore}%</h3>
-              </div>
-              
-              {/* Progress Bar */}
-              <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.75rem' }}>
-                <div style={{ width: `${completionScore}%`, height: '100%', background: 'var(--primary-gradient)', transition: 'width 0.5s ease' }} />
-              </div>
-
-              {missingItems.length > 0 && (
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                  <strong style={{ color: 'var(--text-main)' }}>Action Recommended:</strong> Complete {missingItems.join(', ')} to maximize your candidate match score!
-                </p>
-              )}
-            </div>
-
-            <Link to="/employee/profile" className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>
-              Complete Profile <ChevronRight size={16} />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* STAT CARDS GRID */}
+      {/* METRICS ROW */}
       <div className="grid grid-cols-4" style={{ marginBottom: '1.5rem' }}>
         <StatCard
-          title="Recorded Skills"
+          title="Verified Skills"
           value={loading ? '...' : skills.length}
-          subtitle="Skills in active matrix"
+          subtitle="Inventory entries"
           icon={Award}
+          accent="indigo"
         />
         <StatCard
-          title="Projects Recorded"
-          value={loading ? '...' : projects.length}
-          subtitle="Portfolio projects"
-          icon={FolderGit2}
-        />
-        <StatCard
-          title="Active Applications"
-          value={loading ? '...' : applications.length}
-          subtitle="Submitted requisitions"
+          title="Total Experience"
+          value={loading ? '...' : `${profile?.totalExperienceYears ?? profile?.experience ?? 0} yrs`}
+          subtitle="Engineering tenure"
           icon={Clock}
+          accent="emerald"
         />
         <StatCard
-          title="Matched Opportunities"
-          value={loading ? '...' : recommendations.length}
-          subtitle="Recommended jobs"
+          title="Assigned Projects"
+          value={loading ? '...' : assignments.length}
+          subtitle="Active team roles"
           icon={Briefcase}
+          accent="cyan"
+        />
+        <StatCard
+          title="Top Match Score"
+          value={loading ? '...' : `${topMatch}%`}
+          subtitle="Algorithm alignment"
+          icon={Sparkles}
+          accent="amber"
         />
       </div>
 
-      {/* MAIN TWO COLUMN GRID */}
-      <div className="grid grid-cols-2">
-        {/* RECOMMENDED OPPORTUNITIES FEED */}
+      {/* PROFILE HEALTH & COMPLETENESS */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <Card title="Profile Readiness & Completeness" subtitle="Complete your profile to maximize matching precision">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                Readiness Score: {completionScore}%
+              </span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                {completionScore === 100 ? 'All profile dimensions established' : `${missingItems.length} items to complete`}
+              </span>
+            </div>
+
+            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{
+                width: `${completionScore}%`,
+                height: '100%',
+                backgroundColor: completionScore === 100 ? '#10b981' : completionScore >= 50 ? '#6366f1' : '#f59e0b',
+                transition: 'width 0.4s ease'
+              }} />
+            </div>
+
+            {missingItems.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Suggested additions:</span>
+                {missingItems.map((item, idx) => (
+                  <span key={idx} style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '6px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#fca5a5',
+                    border: '1px solid rgba(239, 68, 68, 0.2)'
+                  }}>
+                    + {item}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem' }}>
+        {/* ASSIGNED PROJECTS WIDGET */}
         <Card
-          title="Top Recommended Opportunities"
-          subtitle="Highest matching job requisitions based on your skill matrix"
+          title="Active Assignments"
+          subtitle="Staffed initiatives"
           action={
-            <Link to="/employee/projects" className="btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', textDecoration: 'none' }}>
-              Explore All <ChevronRight size={14} />
+            <Link to="/employee/projects" className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}>
+              <span>View All</span>
+              <ChevronRight size={14} />
             </Link>
           }
         >
           {loading ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading recommendations...</div>
-          ) : recommendations.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading assignments...</div>
+          ) : assignments.length === 0 ? (
             <div className="empty-state">
-              <Briefcase size={36} />
-              <h3>No recommendations yet</h3>
-              <p>Add skills and project experience to get automated opportunity matches.</p>
+              <Briefcase size={32} />
+              <h3>No active assignments</h3>
+              <p>Project managers will assign you to initiatives matching your skills and experience.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {recommendations.slice(0, 4).map((rec) => {
-                const matchPct = getMatchPercent(rec.matchScore);
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {assignments.slice(0, 3).map((a) => (
+                <div key={a.id} style={{
+                  padding: '0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{a.projectTitle}</h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Role: {a.assignedRole || 'Team Member'}</p>
+                  </div>
+                  <Badge variant="emerald">{a.status || 'ACTIVE'}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* TOP MATCHED PROJECTS WIDGET */}
+        <Card
+          title="Top Algorithmic Matches"
+          subtitle="Ranked by compatibility"
+          action={
+            <Link to="/employee/projects" className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}>
+              <span>View All Matches</span>
+              <ChevronRight size={14} />
+            </Link>
+          }
+        >
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading matches...</div>
+          ) : recommendations.length === 0 ? (
+            <div className="empty-state">
+              <Sparkles size={32} />
+              <h3>No match scores yet</h3>
+              <p>Add your technical skills and domain experience to compute real-time scores.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {recommendations.slice(0, 3).map((rec) => {
+                const score = Math.round(rec.matchScore);
                 return (
-                  <div key={rec.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', transition: 'border-color 0.2s ease' }}>
+                  <div key={rec.id || rec.projectId} style={{
+                    padding: '0.85rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                        <h4 style={{ fontSize: '0.975rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                          {rec.projectTitle || `Opportunity #${rec.projectId}`}
-                        </h4>
-                      </div>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Calculated Match: <strong style={{ color: matchPct >= 80 ? 'var(--success)' : 'var(--primary)' }}>{matchPct}%</strong>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>{rec.projectTitle}</h4>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                        Skills: {rec.skillsPoints ?? 0}/35 pts &bull; {rec.mandatoryPassed !== false ? 'Mandatory Met' : 'Mandatory Flag'}
                       </p>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Badge variant={matchPct >= 80 ? 'success' : matchPct >= 60 ? 'indigo' : 'amber'}>
-                        {matchPct}% Match
-                      </Badge>
-                      <Link to="/employee/projects" className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.775rem' }}>
-                        View Details <ArrowUpRight size={14} />
-                      </Link>
+                      <span style={{
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        color: score >= 75 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171'
+                      }}>
+                        {score}%
+                      </span>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                        onClick={() => { setSelectedMatchId(rec.id); setIsExplanationOpen(true); }}
+                      >
+                        <Eye size={12} />
+                      </button>
                     </div>
                   </div>
                 );
@@ -212,62 +302,13 @@ export default function EmployeeDashboardPage() {
             </div>
           )}
         </Card>
-
-        {/* RECENT APPLICATIONS TABLE */}
-        <Card
-          title="My Recent Applications"
-          subtitle="Status tracker for your recent opportunity submissions"
-          action={
-            <Link to="/employee/applications" className="btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', textDecoration: 'none' }}>
-              View All <ChevronRight size={14} />
-            </Link>
-          }
-        >
-          {loading ? (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-dim)' }}>Loading applications...</div>
-          ) : applications.length === 0 ? (
-            <div className="empty-state">
-              <Clock size={36} />
-              <h3>No applications submitted</h3>
-              <p>Explore recommended projects and submit applications to track progress here.</p>
-            </div>
-          ) : (
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Opportunity</th>
-                    <th>Applied Date</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applications.slice(0, 4).map((app) => (
-                    <tr key={app.id}>
-                      <td style={{ fontWeight: 600 }}>
-                        {app.projectTitle ? app.projectTitle : `Opportunity #${app.projectId}`}
-                      </td>
-                      <td style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                        {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Recent'}
-                      </td>
-                      <td>
-                        <Badge variant={
-                          app.status === 'ACCEPTED' ? 'success' :
-                          app.status === 'REJECTED' ? 'danger' :
-                          app.status === 'SHORTLISTED' ? 'indigo' :
-                          app.status === 'UNDER_REVIEW' ? 'info' : 'amber'
-                        }>
-                          {app.status ? app.status.replace('_', ' ') : 'PENDING'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
       </div>
+
+      <MatchExplanationModal
+        isOpen={isExplanationOpen}
+        onClose={() => setIsExplanationOpen(false)}
+        matchResultId={selectedMatchId}
+      />
     </div>
   );
 }

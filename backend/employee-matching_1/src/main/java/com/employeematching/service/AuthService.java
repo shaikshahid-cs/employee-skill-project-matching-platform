@@ -1,12 +1,13 @@
 package com.employeematching.service;
 
+import com.employeematching.dto.request.ChangePasswordRequest;
 import com.employeematching.dto.request.LoginRequest;
-import com.employeematching.dto.request.RegisterRequest;
 import com.employeematching.dto.response.LoginResponse;
-import com.employeematching.dto.response.RegisterResponse;
+import com.employeematching.dto.response.UserResponse;
 import com.employeematching.entity.User;
 import com.employeematching.repository.UserRepository;
 import com.employeematching.security.JwtService;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -26,15 +27,14 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request) {
-
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() ->
-                        new RuntimeException("Invalid email or password"));
+                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPassword())) {
+        if (!user.isActive()) {
+            throw new RuntimeException("Your account is currently deactivated. Please contact an administrator.");
+        }
 
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid email or password");
         }
 
@@ -47,42 +47,47 @@ public class AuthService {
         return new LoginResponse(
                 token,
                 user.getId(),
-                user.getName(),
+                user.getFullName(),
                 user.getEmail(),
-                user.getRole()
+                user.getRole(),
+                user.isMustChangePassword()
         );
     }
 
-    public RegisterResponse register(RegisterRequest request) {
+    public void changePassword(ChangePasswordRequest request, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
         }
 
-        User user = new User();
-
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        User.Role requestedRole = request.getRole();
-        if (requestedRole == null) {
-            requestedRole = User.Role.EMPLOYEE;
+        if (request.getNewPassword().equals(request.getCurrentPassword())) {
+            throw new RuntimeException("New password must be different from current password");
         }
 
-        if (requestedRole == User.Role.EMPLOYEE || requestedRole == User.Role.MANAGER) {
-            user.setRole(requestedRole);
-        } else {
-            throw new RuntimeException("Invalid registration role. Allowed roles: EMPLOYEE, MANAGER");
-        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+    }
 
-        User savedUser = userRepository.save(user);
-
-        return new RegisterResponse(
-                savedUser.getId(),
-                savedUser.getName(),
-                savedUser.getEmail(),
-                savedUser.getRole()
+    public UserResponse getCurrentUser(Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        return new UserResponse(
+                user.getId(),
+                user.getFullName(),
+                user.getEmail(),
+                user.getRole(),
+                user.isActive(),
+                user.isMustChangePassword(),
+                user.getCreatedAt()
         );
+    }
+
+    private User getAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new RuntimeException("Unauthorized");
+        }
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

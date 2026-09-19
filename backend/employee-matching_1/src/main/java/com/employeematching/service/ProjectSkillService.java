@@ -32,7 +32,6 @@ public class ProjectSkillService {
             SkillRepository skillRepository,
             ManagerRepository managerRepository,
             UserRepository userRepository) {
-
         this.projectSkillRepository = projectSkillRepository;
         this.projectRepository = projectRepository;
         this.skillRepository = skillRepository;
@@ -45,124 +44,85 @@ public class ProjectSkillService {
             Authentication authentication) {
 
         User user = getAuthenticatedUser(authentication);
-
-        Manager manager = managerRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Manager profile not found"));
-
         Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() ->
-                        new RuntimeException("Project not found"));
+                .orElseThrow(() -> new RuntimeException("Project not found"));
 
-        if (!project.getManager().getId().equals(manager.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to modify this project");
-        }
+        validateProjectOwnership(project, user);
 
-        Skill skill = skillRepository
-                .findByNameIgnoreCase(request.getSkillName().trim())
-                .orElseGet(() -> {
-                    Skill newSkill = new Skill();
-                    newSkill.setName(request.getSkillName().trim());
-                    return skillRepository.save(newSkill);
-                });
+        Skill skill = skillRepository.findByNameIgnoreCase(request.getSkillName().trim())
+                .orElseGet(() -> skillRepository.save(new Skill(request.getSkillName().trim(), "General")));
 
-        if (projectSkillRepository
-                .findByProjectIdAndSkillId(
-                        project.getId(),
-                        skill.getId())
-                .isPresent()) {
+        ProjectSkill ps = projectSkillRepository.findByProjectIdAndSkillId(project.getId(), skill.getId())
+                .orElse(new ProjectSkill());
 
-            throw new RuntimeException(
-                    "This skill is already required for the project");
-        }
+        ps.setProject(project);
+        ps.setSkill(skill);
+        ps.setMinProficiency(Math.max(1, Math.min(5, request.getRequiredProficiency())));
+        ps.setImportance(Math.max(1, Math.min(5, request.getImportance())));
+        ps.setMandatory(request.isMandatory());
 
-        ProjectSkill projectSkill = new ProjectSkill();
-
-        projectSkill.setProject(project);
-        projectSkill.setSkill(skill);
-        projectSkill.setRequiredProficiency(
-                request.getRequiredProficiency());
-        projectSkill.setImportance(
-                request.getImportance());
-
-        ProjectSkill saved =
-                projectSkillRepository.save(projectSkill);
-
+        ProjectSkill saved = projectSkillRepository.save(ps);
         return mapToResponse(saved);
     }
 
-    public List<ProjectSkillResponse> getProjectSkills(
-            Long projectId,
-            Authentication authentication) {
-
-        User user = getAuthenticatedUser(authentication);
-
-        Manager manager = managerRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Manager profile not found"));
-
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new RuntimeException("Project not found"));
-
-        if (!project.getManager().getId().equals(manager.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to view this project");
-        }
-
-        return projectSkillRepository
-                .findByProjectId(projectId)
+    public List<ProjectSkillResponse> getProjectSkills(Long projectId, Authentication authentication) {
+        return projectSkillRepository.findByProjectId(projectId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
     public ProjectSkillResponse updateRequiredSkill(
-            Long projectSkillId,
+            Long id,
             ProjectSkillRequest request,
             Authentication authentication) {
 
         User user = getAuthenticatedUser(authentication);
-
-        ProjectSkill projectSkill = projectSkillRepository.findById(projectSkillId)
+        ProjectSkill ps = projectSkillRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project skill requirement not found"));
 
-        if (!projectSkill.getProject().getManager().getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("You are not authorized to modify this project skill");
+        validateProjectOwnership(ps.getProject(), user);
+
+        ps.setMinProficiency(Math.max(1, Math.min(5, request.getRequiredProficiency())));
+        ps.setImportance(Math.max(1, Math.min(5, request.getImportance())));
+        ps.setMandatory(request.isMandatory());
+
+        ProjectSkill updated = projectSkillRepository.save(ps);
+        return mapToResponse(updated);
+    }
+
+    public void removeRequiredSkill(Long id, Authentication authentication) {
+        User user = getAuthenticatedUser(authentication);
+        ProjectSkill ps = projectSkillRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Project skill requirement not found"));
+
+        validateProjectOwnership(ps.getProject(), user);
+        projectSkillRepository.delete(ps);
+    }
+
+    private void validateProjectOwnership(Project project, User user) {
+        boolean isManager = project.getManager().getUser().getId().equals(user.getId());
+        boolean isAdmin = user.getRole() == User.Role.ADMIN;
+        if (!isManager && !isAdmin) {
+            throw new RuntimeException("You are not authorized to modify this project");
         }
-
-        projectSkill.setRequiredProficiency(request.getRequiredProficiency());
-        projectSkill.setImportance(request.getImportance());
-
-        ProjectSkill saved = projectSkillRepository.save(projectSkill);
-
-        return mapToResponse(saved);
     }
 
-    private User getAuthenticatedUser(
-            Authentication authentication) {
-
+    private User getAuthenticatedUser(Authentication authentication) {
         String email = authentication.getName();
-
         return userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Authenticated user not found"));
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
     }
 
-    private ProjectSkillResponse mapToResponse(
-            ProjectSkill projectSkill) {
-
-        Skill skill = projectSkill.getSkill();
-
+    private ProjectSkillResponse mapToResponse(ProjectSkill ps) {
         return new ProjectSkillResponse(
-                projectSkill.getId(),
-                projectSkill.getProject().getId(),
-                skill.getId(),
-                skill.getName(),
-                projectSkill.getRequiredProficiency(),
-                projectSkill.getImportance()
+                ps.getId(),
+                ps.getProject().getId(),
+                ps.getSkill().getId(),
+                ps.getSkill().getName(),
+                ps.getMinProficiency(),
+                ps.getImportance(),
+                ps.isMandatory()
         );
     }
 }

@@ -6,20 +6,28 @@ import axiosClient from './axiosClient';
  */
 export const authApi = {
   /**
-   * Endpoint #1: POST /api/auth/register
-   * Registers a new user account.
-   * @param {Object} data - RegisterRequest { name, email, password }
-   * @returns {Promise<Object>} RegisterResponse { id, name, email, role }
-   */
-  register: (data) => axiosClient.post('/auth/register', data),
-
-  /**
-   * Endpoint #2: POST /api/auth/login
    * Authenticates user credentials and returns JWT token.
    * @param {Object} data - LoginRequest { email, password }
-   * @returns {Promise<Object>} LoginResponse { token, id, name, email, role }
+   * @returns {Promise<Object>} LoginResponse { token, id, name, email, role, mustChangePassword }
    */
   login: (data) => axiosClient.post('/auth/login', data),
+
+  /**
+   * Changes authenticated user password.
+   * @param {Object} data - { currentPassword, newPassword } or { oldPassword, newPassword }
+   * @returns {Promise<Object>} Map { message }
+   */
+  changePassword: (data) =>
+    axiosClient.post('/auth/change-password', {
+      currentPassword: data.currentPassword || data.oldPassword,
+      newPassword: data.newPassword,
+    }),
+
+  /**
+   * Retrieves current authenticated user profile.
+   * @returns {Promise<Object>}
+   */
+  getMe: () => axiosClient.get('/auth/me'),
 };
 
 export default authApi;

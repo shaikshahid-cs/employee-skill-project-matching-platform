@@ -16,12 +16,14 @@ public class ProjectSkillRequest {
     @NotNull(message = "Required proficiency is required")
     @Min(value = 1, message = "Required proficiency must be at least 1")
     @Max(value = 5, message = "Required proficiency must be at most 5")
-    private Integer requiredProficiency;
+    private Integer requiredProficiency = 1;
 
     @NotNull(message = "Importance is required")
     @Min(value = 1, message = "Importance must be at least 1")
     @Max(value = 5, message = "Importance must be at most 5")
-    private Integer importance;
+    private Integer importance = 3;
+
+    private boolean isMandatory = false;
 
     public ProjectSkillRequest() {
     }
@@ -56,5 +58,13 @@ public class ProjectSkillRequest {
 
     public void setImportance(Integer importance) {
         this.importance = importance;
+    }
+
+    public boolean isMandatory() {
+        return isMandatory;
+    }
+
+    public void setMandatory(boolean mandatory) {
+        isMandatory = mandatory;
     }
 }

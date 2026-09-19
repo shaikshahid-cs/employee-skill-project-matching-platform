@@ -28,7 +28,6 @@ public class EmployeeSkillService {
             EmployeeRepository employeeRepository,
             SkillRepository skillRepository,
             UserRepository userRepository) {
-
         this.employeeSkillRepository = employeeSkillRepository;
         this.employeeRepository = employeeRepository;
         this.skillRepository = skillRepository;
@@ -39,13 +38,9 @@ public class EmployeeSkillService {
             EmployeeSkillRequest request,
             Authentication authentication) {
 
-        User user = getAuthenticatedUser(authentication);
+        Employee employee = getAuthenticatedEmployee(authentication);
 
-        Employee employee = employeeRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Employee profile not found"));
-
-        Skill skill = skillRepository.findByNameIgnoreCase(request.getSkillName())
+        Skill skill = skillRepository.findByNameIgnoreCase(request.getSkillName().trim())
                 .orElseGet(() -> {
                     Skill newSkill = new Skill();
                     newSkill.setName(request.getSkillName().trim());
@@ -55,51 +50,73 @@ public class EmployeeSkillService {
         if (employeeSkillRepository.existsByEmployeeIdAndSkillId(
                 employee.getId(),
                 skill.getId())) {
-
-            throw new RuntimeException("Employee already has this skill");
+            throw new RuntimeException("Employee already has this skill in profile");
         }
 
         EmployeeSkill employeeSkill = new EmployeeSkill();
-
         employeeSkill.setEmployee(employee);
         employeeSkill.setSkill(skill);
-        employeeSkill.setProficiency(request.getProficiency());
-        employeeSkill.setYearsExperience(request.getYearsExperience());
+        employeeSkill.setProficiency(Math.max(1, Math.min(5, request.getProficiency())));
+        employeeSkill.setYearsExperience(request.getYearsExperience() != null ? request.getYearsExperience() : 0.0);
 
         EmployeeSkill saved = employeeSkillRepository.save(employeeSkill);
-
         return mapToResponse(saved);
     }
 
-    public List<EmployeeSkillResponse> getMySkills(
+    public EmployeeSkillResponse updateSkill(
+            Long id,
+            EmployeeSkillRequest request,
             Authentication authentication) {
 
-        User user = getAuthenticatedUser(authentication);
+        Employee employee = getAuthenticatedEmployee(authentication);
 
-        Employee employee = employeeRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Employee profile not found"));
+        EmployeeSkill es = employeeSkillRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Skill record not found"));
 
-        return employeeSkillRepository
-                .findByEmployeeId(employee.getId())
+        if (!es.getEmployee().getId().equals(employee.getId())) {
+            throw new RuntimeException("Unauthorized to modify this skill");
+        }
+
+        es.setProficiency(Math.max(1, Math.min(5, request.getProficiency())));
+        if (request.getYearsExperience() != null) {
+            es.setYearsExperience(request.getYearsExperience());
+        }
+
+        EmployeeSkill updated = employeeSkillRepository.save(es);
+        return mapToResponse(updated);
+    }
+
+    public void deleteSkill(Long id, Authentication authentication) {
+        Employee employee = getAuthenticatedEmployee(authentication);
+
+        EmployeeSkill es = employeeSkillRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Skill record not found"));
+
+        if (!es.getEmployee().getId().equals(employee.getId())) {
+            throw new RuntimeException("Unauthorized to remove this skill");
+        }
+
+        employeeSkillRepository.delete(es);
+    }
+
+    public List<EmployeeSkillResponse> getMySkills(Authentication authentication) {
+        Employee employee = getAuthenticatedEmployee(authentication);
+        return employeeSkillRepository.findByEmployeeId(employee.getId())
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    private User getAuthenticatedUser(Authentication authentication) {
-
+    private Employee getAuthenticatedEmployee(Authentication authentication) {
         String email = authentication.getName();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("Authenticated user not found"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return employeeRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Employee profile not found"));
     }
 
     private EmployeeSkillResponse mapToResponse(EmployeeSkill employeeSkill) {
-
         Skill skill = employeeSkill.getSkill();
-
         return new EmployeeSkillResponse(
                 employeeSkill.getId(),
                 skill.getId(),

@@ -10,9 +10,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/employees/education")
+@RequestMapping({"/api/employee/education", "/api/employees/education"})
 public class EducationController {
 
     private final EducationService educationService;
@@ -21,86 +22,39 @@ public class EducationController {
         this.educationService = educationService;
     }
 
-    // =========================
-    // ADD EDUCATION
-    // =========================
-
     @PostMapping
     public ResponseEntity<EducationResponse> addEducation(
             @Valid @RequestBody EducationRequest request,
             Authentication authentication) {
-
-        EducationResponse response =
-                educationService.addEducation(
-                        request,
-                        authentication);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        EducationResponse response = educationService.addEducation(request, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-
-    // =========================
-    // GET MY EDUCATION
-    // =========================
 
     @GetMapping
-    public ResponseEntity<List<EducationResponse>> getMyEducation(
-            Authentication authentication) {
-
-        return ResponseEntity.ok(
-                educationService.getMyEducation(
-                        authentication)
-        );
+    public ResponseEntity<List<EducationResponse>> getMyEducation(Authentication authentication) {
+        return ResponseEntity.ok(educationService.getMyEducation(authentication));
     }
-
-    // =========================
-    // GET EDUCATION BY ID
-    // =========================
 
     @GetMapping("/{id}")
     public ResponseEntity<EducationResponse> getEducationById(
             @PathVariable Long id,
             Authentication authentication) {
-
-        return ResponseEntity.ok(
-                educationService.getEducationById(
-                        id,
-                        authentication)
-        );
+        return ResponseEntity.ok(educationService.getEducationById(id, authentication));
     }
-
-    // =========================
-    // UPDATE EDUCATION
-    // =========================
 
     @PutMapping("/{id}")
     public ResponseEntity<EducationResponse> updateEducation(
             @PathVariable Long id,
             @Valid @RequestBody EducationRequest request,
             Authentication authentication) {
-
-        return ResponseEntity.ok(
-                educationService.updateEducation(
-                        id,
-                        request,
-                        authentication)
-        );
+        return ResponseEntity.ok(educationService.updateEducation(id, request, authentication));
     }
 
-    // =========================
-    // DELETE EDUCATION
-    // =========================
-
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEducation(
+    public ResponseEntity<Map<String, String>> deleteEducation(
             @PathVariable Long id,
             Authentication authentication) {
-
-        educationService.deleteEducation(
-                id,
-                authentication);
-
-        return ResponseEntity.noContent().build();
+        educationService.deleteEducation(id, authentication);
+        return ResponseEntity.ok(Map.of("message", "Education record deleted successfully"));
     }
 }

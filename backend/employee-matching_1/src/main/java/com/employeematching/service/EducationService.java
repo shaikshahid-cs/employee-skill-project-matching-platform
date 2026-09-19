@@ -24,7 +24,6 @@ public class EducationService {
             EducationRepository educationRepository,
             EmployeeRepository employeeRepository,
             UserRepository userRepository) {
-
         this.educationRepository = educationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -37,23 +36,21 @@ public class EducationService {
         Employee employee = getAuthenticatedEmployee(authentication);
 
         Education education = new Education();
-
         education.setEmployee(employee);
-        education.setDegree(request.getDegree());
-        education.setField(request.getField());
-        education.setInstitution(request.getInstitution());
+        education.setDegree(request.getDegree().trim());
+        education.setDegreeLevel(request.getDegreeLevel() != null ? request.getDegreeLevel().trim() : inferDegreeLevel(request.getDegree()));
+        education.setFieldOfStudy(request.getFieldOfStudy() != null ? request.getFieldOfStudy().trim() : "");
+        education.setInstitution(request.getInstitution().trim());
+        education.setStartYear(request.getStartYear() != null ? request.getStartYear() : 0);
         education.setGraduationYear(request.getGraduationYear());
+        education.setGradeGpa(request.getGradeGpa());
 
         Education saved = educationRepository.save(education);
-
         return mapToResponse(saved);
     }
 
-    public List<EducationResponse> getMyEducation(
-            Authentication authentication) {
-
+    public List<EducationResponse> getMyEducation(Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
-
         return educationRepository
                 .findByEmployeeId(employee.getId())
                 .stream()
@@ -61,19 +58,14 @@ public class EducationService {
                 .toList();
     }
 
-    public EducationResponse getEducationById(
-            Long id,
-            Authentication authentication) {
-
+    public EducationResponse getEducationById(Long id, Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
 
         Education education = educationRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Education not found"));
+                .orElseThrow(() -> new RuntimeException("Education not found"));
 
         if (!education.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to access this education");
+            throw new RuntimeException("You are not authorized to access this education");
         }
 
         return mapToResponse(education);
@@ -87,68 +79,64 @@ public class EducationService {
         Employee employee = getAuthenticatedEmployee(authentication);
 
         Education education = educationRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Education not found"));
+                .orElseThrow(() -> new RuntimeException("Education not found"));
 
         if (!education.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to modify this education");
+            throw new RuntimeException("You are not authorized to update this education");
         }
 
-        education.setDegree(request.getDegree());
-        education.setField(request.getField());
-        education.setInstitution(request.getInstitution());
+        education.setDegree(request.getDegree().trim());
+        education.setDegreeLevel(request.getDegreeLevel() != null ? request.getDegreeLevel().trim() : inferDegreeLevel(request.getDegree()));
+        education.setFieldOfStudy(request.getFieldOfStudy() != null ? request.getFieldOfStudy().trim() : "");
+        education.setInstitution(request.getInstitution().trim());
+        education.setStartYear(request.getStartYear() != null ? request.getStartYear() : 0);
         education.setGraduationYear(request.getGraduationYear());
+        education.setGradeGpa(request.getGradeGpa());
 
         Education updated = educationRepository.save(education);
-
         return mapToResponse(updated);
     }
 
-    public void deleteEducation(
-            Long id,
-            Authentication authentication) {
-
+    public void deleteEducation(Long id, Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
 
         Education education = educationRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Education not found"));
+                .orElseThrow(() -> new RuntimeException("Education not found"));
 
         if (!education.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to delete this education");
+            throw new RuntimeException("You are not authorized to delete this education");
         }
 
         educationRepository.delete(education);
     }
 
-    private Employee getAuthenticatedEmployee(
-            Authentication authentication) {
-
-        String email = authentication.getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Authenticated user not found"));
-
-        return employeeRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Employee profile not found"));
+    private String inferDegreeLevel(String degree) {
+        if (degree == null) return "BACHELOR";
+        String lower = degree.toLowerCase();
+        if (lower.contains("phd") || lower.contains("doctor")) return "DOCTORATE";
+        if (lower.contains("master") || lower.contains("m.s") || lower.contains("mtech") || lower.contains("m.tech") || lower.contains("mba")) return "MASTER";
+        if (lower.contains("diploma") || lower.contains("associate")) return "DIPLOMA";
+        return "BACHELOR";
     }
 
-    private EducationResponse mapToResponse(
-            Education education) {
+    private Employee getAuthenticatedEmployee(Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        return employeeRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Employee profile not found"));
+    }
 
+    private EducationResponse mapToResponse(Education education) {
         return new EducationResponse(
                 education.getId(),
-                education.getEmployee().getId(),
                 education.getDegree(),
-                education.getField(),
+                education.getDegreeLevel(),
+                education.getFieldOfStudy(),
                 education.getInstitution(),
-                education.getGraduationYear()
+                education.getStartYear(),
+                education.getGraduationYear(),
+                education.getGradeGpa()
         );
     }
 }

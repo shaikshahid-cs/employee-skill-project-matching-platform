@@ -1,16 +1,20 @@
 package com.employeematching.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
-
 public class ManagerProfileRequest {
 
-    @NotBlank
+    private String fullName;
     private String department;
-
-    @NotBlank
-    private String designation;
+    private String phone;
 
     public ManagerProfileRequest() {
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
     }
 
     public String getDepartment() {
@@ -21,11 +25,11 @@ public class ManagerProfileRequest {
         this.department = department;
     }
 
-    public String getDesignation() {
-        return designation;
+    public String getPhone() {
+        return phone;
     }
 
-    public void setDesignation(String designation) {
-        this.designation = designation;
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 }

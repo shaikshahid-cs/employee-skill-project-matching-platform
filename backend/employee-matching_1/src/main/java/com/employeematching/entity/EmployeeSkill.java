@@ -10,18 +10,30 @@ public class EmployeeSkill {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "skill_id", nullable = false)
     private Skill skill;
 
-    private int proficiency;
-    private double yearsExperience;
+    @Column(nullable = false)
+    private int proficiency; // 1 to 5 scale
+
+    @Column(name = "years_of_experience")
+    private Double yearsOfExperience = 0.0;
+
+    @Column(name = "last_used_year")
+    private Integer lastUsedYear;
 
     public EmployeeSkill() {
+    }
+
+    public EmployeeSkill(Employee employee, Skill skill, int proficiency) {
+        this.employee = employee;
+        this.skill = skill;
+        this.proficiency = proficiency;
     }
 
     public Long getId() {
@@ -56,11 +68,28 @@ public class EmployeeSkill {
         this.proficiency = proficiency;
     }
 
+    public Double getYearsOfExperience() {
+        return yearsOfExperience;
+    }
+
+    public void setYearsOfExperience(Double yearsOfExperience) {
+        this.yearsOfExperience = yearsOfExperience;
+    }
+
+    // Compatibility getter/setter
     public double getYearsExperience() {
-        return yearsExperience;
+        return yearsOfExperience != null ? yearsOfExperience : 0.0;
     }
 
     public void setYearsExperience(double yearsExperience) {
-        this.yearsExperience = yearsExperience;
+        this.yearsOfExperience = yearsExperience;
+    }
+
+    public Integer getLastUsedYear() {
+        return lastUsedYear;
+    }
+
+    public void setLastUsedYear(Integer lastUsedYear) {
+        this.lastUsedYear = lastUsedYear;
     }
 }

@@ -24,7 +24,6 @@ public class CertificationService {
             CertificationRepository certificationRepository,
             EmployeeRepository employeeRepository,
             UserRepository userRepository) {
-
         this.certificationRepository = certificationRepository;
         this.employeeRepository = employeeRepository;
         this.userRepository = userRepository;
@@ -37,26 +36,19 @@ public class CertificationService {
         Employee employee = getAuthenticatedEmployee(authentication);
 
         Certification certification = new Certification();
-
         certification.setEmployee(employee);
-        certification.setName(request.getName());
-        certification.setIssuingOrganization(
-                request.getIssuingOrganization()
-        );
+        certification.setName(request.getName().trim());
+        certification.setIssuingOrganization(request.getIssuingOrganization().trim());
         certification.setIssueDate(request.getIssueDate());
         certification.setExpiryDate(request.getExpiryDate());
+        certification.setCredentialId(request.getCredentialId());
 
-        Certification saved =
-                certificationRepository.save(certification);
-
+        Certification saved = certificationRepository.save(certification);
         return mapToResponse(saved);
     }
 
-    public List<CertificationResponse> getMyCertifications(
-            Authentication authentication) {
-
+    public List<CertificationResponse> getMyCertifications(Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
-
         return certificationRepository
                 .findByEmployeeId(employee.getId())
                 .stream()
@@ -64,21 +56,14 @@ public class CertificationService {
                 .toList();
     }
 
-    public CertificationResponse getCertificationById(
-            Long id,
-            Authentication authentication) {
-
+    public CertificationResponse getCertificationById(Long id, Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
 
-        Certification certification =
-                certificationRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Certification not found"));
+        Certification certification = certificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (!certification.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to access this certification");
+            throw new RuntimeException("You are not authorized to access this certification");
         }
 
         return mapToResponse(certification);
@@ -91,76 +76,52 @@ public class CertificationService {
 
         Employee employee = getAuthenticatedEmployee(authentication);
 
-        Certification certification =
-                certificationRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Certification not found"));
+        Certification certification = certificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (!certification.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to modify this certification");
+            throw new RuntimeException("You are not authorized to update this certification");
         }
 
-        certification.setName(request.getName());
-        certification.setIssuingOrganization(
-                request.getIssuingOrganization()
-        );
+        certification.setName(request.getName().trim());
+        certification.setIssuingOrganization(request.getIssuingOrganization().trim());
         certification.setIssueDate(request.getIssueDate());
         certification.setExpiryDate(request.getExpiryDate());
+        certification.setCredentialId(request.getCredentialId());
 
-        Certification updated =
-                certificationRepository.save(certification);
-
+        Certification updated = certificationRepository.save(certification);
         return mapToResponse(updated);
     }
 
-    public void deleteCertification(
-            Long id,
-            Authentication authentication) {
-
+    public void deleteCertification(Long id, Authentication authentication) {
         Employee employee = getAuthenticatedEmployee(authentication);
 
-        Certification certification =
-                certificationRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Certification not found"));
+        Certification certification = certificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Certification not found"));
 
         if (!certification.getEmployee().getId().equals(employee.getId())) {
-            throw new RuntimeException(
-                    "You are not authorized to delete this certification");
+            throw new RuntimeException("You are not authorized to delete this certification");
         }
 
         certificationRepository.delete(certification);
     }
 
-    private Employee getAuthenticatedEmployee(
-            Authentication authentication) {
-
+    private Employee getAuthenticatedEmployee(Authentication authentication) {
         String email = authentication.getName();
-
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Authenticated user not found"));
-
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
         return employeeRepository.findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Employee profile not found"));
+                .orElseThrow(() -> new RuntimeException("Employee profile not found"));
     }
 
-    private CertificationResponse mapToResponse(
-            Certification certification) {
-
+    private CertificationResponse mapToResponse(Certification certification) {
         return new CertificationResponse(
                 certification.getId(),
-                certification.getEmployee().getId(),
                 certification.getName(),
                 certification.getIssuingOrganization(),
                 certification.getIssueDate(),
-                certification.getExpiryDate()
+                certification.getExpiryDate(),
+                certification.getCredentialId()
         );
     }
 }

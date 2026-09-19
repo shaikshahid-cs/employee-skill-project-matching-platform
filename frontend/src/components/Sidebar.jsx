@@ -21,10 +21,10 @@ const navConfig = {
     { label: 'Dashboard', path: '/employee/dashboard', icon: LayoutDashboard },
     { label: 'My Profile', path: '/employee/profile', icon: User },
     { label: 'My Skills', path: '/employee/skills', icon: Award },
+    { label: 'Work Experience', path: '/employee/experience', icon: Briefcase },
     { label: 'Qualifications', path: '/employee/qualifications', icon: GraduationCap },
-    { label: 'Resume Manager', path: '/employee/resume', icon: FileText },
-    { label: 'Explore Projects', path: '/employee/projects', icon: Compass },
-    { label: 'My Applications', path: '/employee/applications', icon: CheckCircle },
+    { label: 'Resume Parser', path: '/employee/resume', icon: FileText },
+    { label: 'My Projects', path: '/employee/projects', icon: Compass },
     { label: 'Match Results', path: '/employee/matches', icon: Zap },
   ],
   manager: [

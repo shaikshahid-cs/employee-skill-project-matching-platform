@@ -38,11 +38,23 @@ public class EmployeeSkillRequest {
         this.proficiency = proficiency;
     }
 
+    public void setProficiencyLevel(Integer proficiencyLevel) {
+        if (this.proficiency == null) {
+            this.proficiency = proficiencyLevel;
+        }
+    }
+
     public Double getYearsExperience() {
         return yearsExperience;
     }
 
     public void setYearsExperience(Double yearsExperience) {
         this.yearsExperience = yearsExperience;
+    }
+
+    public void setYearsOfExperience(Double yearsOfExperience) {
+        if (this.yearsExperience == null) {
+            this.yearsExperience = yearsOfExperience;
+        }
     }
 }

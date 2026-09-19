@@ -1,37 +1,36 @@
 import axiosClient from './axiosClient';
 
 /**
- * Project Management & Discovery API Service Module
- * Handles endpoints exposed by ProjectController (/api/managers/projects) & ProjectDiscoveryController (/api/projects)
+ * Project Management & Assignment API Service Module
+ * Handles endpoints exposed by ProjectController (/api/manager/projects) and EmployeeAssignmentController (/api/employee/assignments)
  */
 export const projectApi = {
-  /**
-   * Endpoint #10: POST /api/managers/projects
-   * Creates a new project posting.
-   * @param {Object} data - ProjectRequest { title, description, department, location, experienceRequired }
-   * @returns {Promise<Object>} ProjectResponse { id, managerId, title, description, department, location, experienceRequired, status }
-   */
-  createProject: (data) => axiosClient.post('/managers/projects', data),
+  createProject: (data) => axiosClient.post('/manager/projects', data),
 
-  /**
-   * Endpoint #11: GET /api/managers/projects
-   * Retrieves projects created by the authenticated manager.
-   * @returns {Promise<Array>} List<ProjectResponse>
-   */
-  getManagerProjects: () => axiosClient.get('/managers/projects'),
+  getManagerProjects: () => axiosClient.get('/manager/projects'),
 
-  /**
-   * Endpoint #12: GET /api/projects/open
-   * Browses open projects available for employee application.
-   * @returns {Promise<Array>} List<ProjectResponse>
-   */
+  getProjectById: (id) => axiosClient.get(`/manager/projects/${id}`),
+
+  updateProject: (id, data) => axiosClient.put(`/manager/projects/${id}`, data),
+
+  deleteProject: (id) => axiosClient.delete(`/manager/projects/${id}`),
+
+  // Team assignments
+  assignEmployee: (projectId, employeeId, role) =>
+    axiosClient.post(`/manager/projects/${projectId}/assignments`, { employeeId, role }),
+
+  unassignEmployee: (projectId, employeeId) =>
+    axiosClient.delete(`/manager/projects/${projectId}/assignments/${employeeId}`),
+
+  getProjectAssignments: (projectId) =>
+    axiosClient.get(`/manager/projects/${projectId}/assignments`),
+
+  // Employee side assignments
+  getMyAssignedProjects: () => axiosClient.get('/employee/assignments'),
+
+  // Open projects discovery
   getOpenProjects: () => axiosClient.get('/projects/open'),
 
-  /**
-   * Endpoint #13: GET /api/projects/recommendations
-   * Fetches personalized project recommendations for the authenticated employee.
-   * @returns {Promise<Array>} List<MatchResultResponse>
-   */
   getRecommendedProjects: () => axiosClient.get('/projects/recommendations'),
 };
 

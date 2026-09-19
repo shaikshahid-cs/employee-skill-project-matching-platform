@@ -110,11 +110,8 @@ export default function LoginPage() {
       </form>
 
       <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ fontWeight: 600 }}>
-            Register here
-          </Link>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+          Enterprise Account Notice: All user accounts are centrally provisioned by System Administrators. Contact your administrator if you need access.
         </p>
       </div>
     </div>

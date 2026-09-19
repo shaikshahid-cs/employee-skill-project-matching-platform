@@ -10,10 +10,22 @@ public class Skill {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true, nullable = false, length = 100)
     private String name;
 
+    @Column(length = 50)
+    private String category;
+
     public Skill() {
+    }
+
+    public Skill(String name) {
+        this.name = name;
+    }
+
+    public Skill(String name, String category) {
+        this.name = name;
+        this.category = category;
     }
 
     public Long getId() {
@@ -30,5 +42,13 @@ public class Skill {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }

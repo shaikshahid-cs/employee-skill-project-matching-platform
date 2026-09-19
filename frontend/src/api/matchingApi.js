@@ -62,6 +62,17 @@ export const matchingApi = {
   getMatchExplanation: (id) => axiosClient.get(`/match-results/${id}/explanation`),
 
   /**
+   * Retrieves candidate matches calculated specifically for a manager's project
+   */
+  getCandidatesForProject: (projectId) => axiosClient.get(`/manager/projects/${projectId}/candidates`),
+
+  /**
+   * Retrieves detailed candidate explainability for a project
+   */
+  getCandidateExplanation: (projectId, employeeId) =>
+    axiosClient.get(`/manager/projects/${projectId}/candidates/${employeeId}/explanation`),
+
+  /**
    * Endpoint #40: DELETE /api/match-results/{id}
    * Deletes a match result entry.
    * @param {number|string} id - MatchResult record ID
